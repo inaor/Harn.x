@@ -51,7 +51,7 @@ export class CausalGraph {
       if (!event) continue
       chain.push(event)
       const links = event.links ?? {}
-      for (const key of ['caused_by', 'parent_event', 'context_source', 'result_of', 'policy_decision_for', 'delegated_by'] as const) {
+      for (const key of ['caused_by', 'parent_event', 'context_source', 'candidate_context_source', 'correlated_with', 'result_of', 'policy_decision_for', 'delegated_by'] as const) {
         const ref = links[key]
         if (ref) queue.push(ref)
       }

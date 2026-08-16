@@ -70,7 +70,6 @@ export function trustForToolResult(toolName: string): TrustLevel {
   if (toolName === 'read' || toolName.includes('fs') || toolName === 'web_fetch' || toolName === 'web_search') {
     return 'untrusted'
   }
-  if (toolName.startsWith('mcp__')) return 'untrusted'
   return 'unknown'
 }
 
@@ -87,9 +86,12 @@ export function baseEvent(
     harness: partial.harness ?? { name: 'deepseek-dsh' },
     event_type: partial.event_type,
     session: partial.session,
+    ...partial.turn !== undefined ? { turn: partial.turn } : {},
+    ...partial.step !== undefined ? { step: partial.step } : {},
     ...partial.agent ? { agent: partial.agent } : {},
     ...partial.objective ? { objective: partial.objective } : {},
     ...partial.context ? { context: partial.context } : {},
+    ...partial.mcp ? { mcp: partial.mcp } : {},
     ...partial.action ? { action: partial.action } : {},
     ...partial.tool ? { tool: partial.tool } : {},
     ...partial.capability ? { capability: partial.capability } : {},

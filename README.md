@@ -190,7 +190,21 @@ Live attach is the next integration step; the demo above proves the recorder, gr
 | Phase | Status |
 |---|---|
 | 0 — DeepSeek choke-point map | Complete — [`docs/deepseek-harness-architecture.md`](docs/deepseek-harness-architecture.md) |
-| 1 — Harness flight recorder | Complete — CLI PoC above |
+| 1 — Harness flight recorder + **live DSH validation** | **COMPLETE** — [`docs/phase1-live-validation.md`](docs/phase1-live-validation.md) |
+
+Blind spots: [`docs/blind-spots.md`](docs/blind-spots.md)
+
+### Live proof (integration)
+
+```sh
+cd packages/harnesssec
+npm ci
+npm run build
+npm test
+npm run test:integration
+```
+
+Expected: BLOCK leaves `/tmp/harnx-proof` absent; ALLOW creates `/tmp/harnx-allow-ok`; `ctx.shell` bypass is invisible to Harn.x.
 
 ## Docs
 

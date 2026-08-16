@@ -1,52 +1,50 @@
-# Phase 1 Findings
-
-## Thesis under test
-
-> There is security-relevant semantic information inside the agent harness that existing endpoint, runtime, network, identity, and cloud security layers cannot reliably reconstruct — and HarnessSec can use that information to detect or prevent dangerous autonomous behavior.
+# Phase 1 Findings (updated after live validation)
 
 ## Verdict
 
-**Thesis holds for the verified DeepSeek Harness surface.**
+**Phase 1 COMPLETE.**
 
-We demonstrated (see `harnesssec demo` / tests):
+Live DeepSeek Harness execution demonstrated:
 
-| Criterion | Result |
-|---|---|
-| Agent-aware session recording | Yes |
-| Tool intent before execution | Yes (`tools/pre-execute`) |
-| Context provenance | Yes (`MessageSource` + untrusted tool results) |
-| MCP provenance | Yes (`mcp__server__tool` naming) |
-| Agent lineage | Yes (`subagent/start` wired; demo uses single agent) |
-| Capability available vs used | Yes (snapshot + used set) |
-| Causal event graph | Yes (`links.*` + `graph.why`) |
-| Pre-execution policy | Yes |
-| Action blocking | Yes (`PreToolDecision.deny` — Phase 0 verified) |
-| Post-block agent behavior | Yes (`policy.aftermath`) |
-| Session replay | Yes (`harnesssec replay`) |
+- BLOCK before tool body (`/tmp/harnx-proof` absent)
+- ALLOW control (`/tmp/harnx-allow-ok` present)
+- Agent-loop model → bash blocked
+- Bypass via `ctx.shell` documented as a blind spot
 
-At least one capability is hard to reconstruct from OS/network alone:
+See [`phase1-live-validation.md`](./phase1-live-validation.md) and [`blind-spots.md`](./blind-spots.md).
 
-> **Blocked `bash` / `cat ~/.ssh/id_rsa` after untrusted README context — no process is spawned; the causal chain (objective → untrusted context → tool intent → BLOCK) exists only in harness semantics.**
+---
 
-## What we did **not** prove
+## Thesis
 
-- Live attach inside a running `dsh` process in CI (adapter is written to the verified Cordis seams; install via `dsh plugin add`)
-- OS-level file/network telemetry (intentionally out of scope)
-- Peer plugin admission control
-- Perfect taint tracking (only defensible provenance)
-- That every bypass path is closed (direct `ctx.shell`, shell children, external subagents remain)
+> There is security-relevant semantic information inside the agent harness that existing endpoint/runtime/network layers cannot reliably reconstruct — and Harn.x can use it to detect or prevent dangerous autonomous behavior.
 
-## Differentiator captured
+**Holds** for tool-mediated paths. **Does not hold** for direct capability seams (`ctx.shell`, etc.).
 
-```text
-HARNESS_NATIVE:
-  agent identity, session, tool intent, context source/trust,
-  MCP tool naming, sub-agent edges, policy decision, aftermath
+---
 
-NOT OUR LAYER:
-  process.exec, file.read, network.connect
-```
+## What changed since the demo-only milestone
 
-## Recommendation
+| Item | Before | After |
+|---|---|---|
+| Execution proof | Simulated demo events | Real `dsh-tools` + bash + agent-loop |
+| Side-effect proof | Claimed | `/tmp/harnx-proof` absent after BLOCK |
+| Causality links | Over-claimed `caused_by` / sticky context | `candidate_context_source` / `correlated_with`; turn-scoped |
+| MCP | Alert on all `mcp__*` | trusted / untrusted / unknown registry |
+| Secrets | Persisted raw | Redacted before disk |
+| CI | None | build + unit + integration |
 
-Proceed to a **thin live integration test** against DeepSeek Harness (`dsh plugin add` + one headless turn) before expanding rules. Do not start eBPF / dashboards.
+---
+
+## Differentiator still unique to harness
+
+Blocked bash with credential path in args:
+
+- EDR sees **no process**
+- Harn.x records agent, session, tool intent, policy decision, optional same-turn untrusted context correlation
+
+---
+
+## Do not expand into
+
+Dashboard, eBPF, more harness adapters, or large rule packs — until live attach via `dsh plugin add` is exercised in a production-like profile if needed.

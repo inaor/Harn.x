@@ -28,11 +28,20 @@ export type EventType =
   | 'approval.decided'
 
 export interface EventLinks {
+  /** Use only when causality is defensible (e.g. tool.denied result_of tool.requested). */
   caused_by?: string
   parent_event?: string
   parent_agent?: string
   delegated_by?: string
+  /**
+   * @deprecated Prefer candidate_context_source. Kept for older sessions.
+   * Do not emit for temporal co-occurrence alone.
+   */
   context_source?: string
+  /** Same-turn untrusted context that may have influenced this action (correlation). */
+  candidate_context_source?: string
+  /** Temporal or weak association — not a causal claim. */
+  correlated_with?: string
   tool_source?: string
   result_of?: string
   policy_decision_for?: string
@@ -49,6 +58,9 @@ export interface HarnessEvent {
   session: {
     id: string
   }
+  /** Active agent turn when known (from agent/pre-step or session turn/start). */
+  turn?: number
+  step?: number
   agent?: {
     id: string
     parent_agent_id?: string | null
@@ -63,6 +75,14 @@ export interface HarnessEvent {
     source?: string
     trust: TrustLevel
     excerpt?: string
+    /** Turn where this context was introduced / associated. */
+    turn?: number
+    step?: number
+  }
+  mcp?: {
+    server: string
+    tool?: string
+    trust: TrustLevel
   }
   action?: {
     type: string

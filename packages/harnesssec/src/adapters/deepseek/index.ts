@@ -14,6 +14,7 @@ import { homedir } from 'node:os'
 import { FlightRecorder } from '../../core/recorder.js'
 import { PolicyEngine } from '../../policy/engine.js'
 import { defaultRules } from '../../policy/rules.js'
+import { McpTrustRegistry, DEFAULT_MCP_TRUST } from '../../core/mcp-trust.js'
 import {
   baseEvent,
   classifyToolSensitivity,
@@ -29,17 +30,13 @@ export const name = 'harnesssec'
 export const inject = ['tools']
 
 export interface AdapterConfig {
-  /** Directory for session JSON flight records. Default: ~/.harnesssec/sessions */
   storeDir?: string
-  /** When true (default), return { kind: 'deny' } from tools/pre-execute on BLOCK. */
   enforce?: boolean
-  /** Emit live lines to stderr. */
   verbose?: boolean
+  mcpTrust?: Record<string, 'trusted' | 'untrusted' | 'unknown'>
 }
 
-export const Config = {
-  // Schemastery-compatible loose shape for dsh Config field; runtime validates lightly.
-}
+export const Config = {}
 
 export interface CordisLikeContext {
   on(event: string, listener: (...args: any[]) => any, options?: { prepend?: boolean }): () => void
@@ -69,16 +66,21 @@ export interface PreToolDecisionLike {
 }
 
 let sharedRecorder: FlightRecorder | undefined
-let sharedPolicy: PolicyEngine | undefined
 
 export function getSharedRecorder(): FlightRecorder | undefined {
   return sharedRecorder
 }
 
-export function createRuntime(storeDir?: string): { recorder: FlightRecorder; policy: PolicyEngine } {
+export function createRuntime(
+  storeDir?: string,
+  mcpTrust?: Record<string, 'trusted' | 'untrusted' | 'unknown'>,
+): { recorder: FlightRecorder; policy: PolicyEngine } {
   const dir = storeDir ?? join(homedir(), '.harnesssec', 'sessions')
   mkdirSync(dir, { recursive: true })
-  const recorder = new FlightRecorder(dir)
+  const recorder = new FlightRecorder(
+    dir,
+    new McpTrustRegistry({ ...DEFAULT_MCP_TRUST, ...mcpTrust }),
+  )
   const policy = new PolicyEngine(recorder, defaultRules)
   return { recorder, policy }
 }
@@ -86,9 +88,10 @@ export function createRuntime(storeDir?: string): { recorder: FlightRecorder; po
 export function apply(ctx: CordisLikeContext, config: AdapterConfig = {}): void {
   const enforce = config.enforce !== false
   const verbose = config.verbose !== false
-  const { recorder, policy } = createRuntime(config.storeDir)
+  const { recorder, policy } = createRuntime(config.storeDir, config.mcpTrust)
   sharedRecorder = recorder
-  sharedPolicy = policy
+
+  const stepPos = new Map<string, { turn: number; step: number; agentId?: string }>()
 
   const log = (msg: string) => {
     if (!verbose) return
@@ -97,7 +100,6 @@ export function apply(ctx: CordisLikeContext, config: AdapterConfig = {}): void 
 
   log('HarnessSec attached (deepseek-dsh adapter)')
 
-  // --- session / agent lifecycle via session/event + agent events ---
   ctx.on('session/created', (session: { id: string }) => {
     recorder.record(baseEvent({
       event_type: 'session.started',
@@ -134,39 +136,65 @@ export function apply(ctx: CordisLikeContext, config: AdapterConfig = {}): void 
     }))
   })
 
-  // --- context / objective from pre-step ---
   ctx.on('agent/pre-step', async (
-    payload: { messages?: unknown[]; turn?: number; step?: number; signal?: AbortSignal },
+    payload: { messages?: unknown[]; turn?: number; step?: number },
     next: () => Promise<{ kind: string; messages?: unknown[] }>,
   ) => {
     const decision = await next()
-    // We observe after next() to avoid vetoing unless we later add reject rules.
-    // Agent id is not always on payload; try tools/agents via scope — best effort.
+    if (typeof payload.turn === 'number') {
+      for (const [sessionId, pos] of stepPos) {
+        stepPos.set(sessionId, {
+          turn: payload.turn,
+          step: typeof payload.step === 'number' ? payload.step : 0,
+          agentId: pos.agentId,
+        })
+      }
+    }
     return decision
   })
 
-  // Durable firehose: user messages + tool results for provenance
   ctx.on('session/event', (session: { id: string }, event: { type: string; data?: any }) => {
     const sessionId = String(session.id)
+    if (event.type === 'turn/start' && typeof event.data?.turn === 'number') {
+      stepPos.set(sessionId, {
+        turn: event.data.turn,
+        step: 0,
+        agentId: stepPos.get(sessionId)?.agentId,
+      })
+    }
+    if (event.type === 'step/start' && typeof event.data?.turn === 'number') {
+      stepPos.set(sessionId, {
+        turn: event.data.turn,
+        step: typeof event.data.step === 'number' ? event.data.step : 0,
+        agentId: stepPos.get(sessionId)?.agentId,
+      })
+    }
     if (event.type === 'user/message') {
-      handleUserMessage(recorder, sessionId, event.data)
+      const pos = stepPos.get(sessionId)
+      handleUserMessage(recorder, sessionId, event.data, pos?.turn, pos?.step, pos?.agentId)
     }
     if (event.type === 'tool/result' && event.data) {
-      // Tool result content can introduce untrusted context (e.g. read README)
       const toolName = String(event.data.name ?? event.data.toolName ?? '')
       if (toolName && trustForToolResult(toolName) === 'untrusted') {
         const excerpt = textExcerpt(JSON.stringify(event.data.content ?? event.data))
         const ctxId = `ctx_${newEventId().slice(4)}`
+        const pos = stepPos.get(sessionId)
         recorder.record(baseEvent({
           event_type: 'context.introduced',
           session: { id: sessionId },
-          agent: event.data.agentId ? { id: String(event.data.agentId) } : undefined,
+          turn: pos?.turn,
+          step: pos?.step,
+          agent: event.data.agentId
+            ? { id: String(event.data.agentId) }
+            : pos?.agentId ? { id: pos.agentId } : undefined,
           context: {
             id: ctxId,
             source_type: toolName === 'web_fetch' ? 'website' : 'tool_result',
             source: toolName,
             trust: 'untrusted',
             excerpt,
+            turn: pos?.turn,
+            step: pos?.step,
           },
           raw: { source_hook: 'session/event:tool/result' },
         }))
@@ -174,27 +202,45 @@ export function apply(ctx: CordisLikeContext, config: AdapterConfig = {}): void 
     }
   })
 
-  // --- PRE-EXECUTION ENFORCEMENT (verified Phase 0 choke point) ---
   ctx.on('tools/pre-execute', async (
     exec: ToolExecLike,
     next: () => Promise<PreToolDecisionLike>,
   ): Promise<PreToolDecisionLike> => {
     const sessionId = String(exec.agent?.session?.id ?? 'unknown-session')
     const agentId = exec.agent ? String(exec.agent.id) : undefined
+    if (agentId) {
+      const prev = stepPos.get(sessionId)
+      stepPos.set(sessionId, {
+        turn: prev?.turn ?? 1,
+        step: prev?.step ?? 0,
+        agentId,
+      })
+    }
+    const pos = stepPos.get(sessionId)
+    const turn = pos?.turn
+    const step = pos?.step
     const toolName = exec.name
     const args = exec.arguments
     const sensitivity = classifyToolSensitivity(toolName, args)
 
+    const mcpMeta = isMcpToolName(toolName) ? parseMcpToolName(toolName) : undefined
+    const mcpTrustLevel = mcpMeta ? recorder.mcpTrust.observe(mcpMeta.server) : undefined
+
     const requested = recorder.record(baseEvent({
       event_type: 'tool.requested',
       session: { id: sessionId },
+      turn,
+      step,
       agent: agentId ? { id: agentId, parent_agent_id: null } : undefined,
       tool: {
         name: toolName,
         call_id: exec.callId ? String(exec.callId) : undefined,
         sensitivity,
-        provider: isMcpToolName(toolName) ? 'mcp' : 'native',
+        provider: mcpMeta ? 'mcp' : 'native',
       },
+      ...mcpMeta ? {
+        mcp: { server: mcpMeta.server, tool: mcpMeta.tool, trust: mcpTrustLevel! },
+      } : {},
       action: {
         type: 'tool.request',
         target: toolName,
@@ -210,6 +256,8 @@ export function apply(ctx: CordisLikeContext, config: AdapterConfig = {}): void 
         recorder.record(baseEvent({
           event_type: 'shell.command_requested',
           session: { id: sessionId },
+          turn,
+          step,
           agent: agentId ? { id: agentId } : undefined,
           tool: { name: toolName, sensitivity },
           action: { type: 'shell.command', target: command, arguments: { command } },
@@ -219,16 +267,18 @@ export function apply(ctx: CordisLikeContext, config: AdapterConfig = {}): void 
       }
     }
 
-    if (isMcpToolName(toolName)) {
-      const parsed = parseMcpToolName(toolName)
+    if (mcpMeta) {
       recorder.record(baseEvent({
         event_type: 'mcp.tool_requested',
         session: { id: sessionId },
+        turn,
+        step,
         agent: agentId ? { id: agentId } : undefined,
-        tool: { name: toolName, provider: parsed?.server, sensitivity },
+        tool: { name: toolName, provider: mcpMeta.server, sensitivity },
+        mcp: { server: mcpMeta.server, tool: mcpMeta.tool, trust: mcpTrustLevel! },
         action: {
           type: 'mcp.tool',
-          target: parsed ? `${parsed.server}/${parsed.tool}` : toolName,
+          target: `${mcpMeta.server}/${mcpMeta.tool}`,
           arguments: asPlainArgs(args),
         },
         links: { parent_event: requested.id, tool_source: requested.id },
@@ -243,6 +293,8 @@ export function apply(ctx: CordisLikeContext, config: AdapterConfig = {}): void 
       recorder.record(baseEvent({
         event_type: 'tool.denied',
         session: { id: sessionId },
+        turn,
+        step,
         agent: agentId ? { id: agentId } : undefined,
         tool: { name: toolName, sensitivity },
         action: requested.action,
@@ -253,7 +305,6 @@ export function apply(ctx: CordisLikeContext, config: AdapterConfig = {}): void 
         },
         raw: { source_hook: 'tools/pre-execute:deny' },
       }))
-      // Do NOT call next() after deny — return deny decision directly.
       return {
         kind: 'deny',
         reason: verdict.reason ?? `blocked by harnesssec:${verdict.rule?.id ?? 'policy'}`,
@@ -268,16 +319,18 @@ export function apply(ctx: CordisLikeContext, config: AdapterConfig = {}): void 
       }
     }
 
-    // Allow / alert: continue waterfall
     return next()
   }, { prepend: true })
 
   ctx.on('tools/result', (exec: ToolExecLike, result: { isError?: boolean }) => {
     const sessionId = String(exec.agent?.session?.id ?? 'unknown-session')
     const agentId = exec.agent ? String(exec.agent.id) : undefined
+    const pos = stepPos.get(sessionId)
     recorder.record(baseEvent({
       event_type: 'tool.completed',
       session: { id: sessionId },
+      turn: pos?.turn,
+      step: pos?.step,
       agent: agentId ? { id: agentId } : undefined,
       tool: { name: exec.name },
       action: {
@@ -287,10 +340,6 @@ export function apply(ctx: CordisLikeContext, config: AdapterConfig = {}): void 
       },
       raw: { source_hook: 'tools/result' },
     }))
-  })
-
-  ctx.on('tools/change', () => {
-    // Best-effort global snapshot without agent id
   })
 
   ctx.on('subagent/start', (info: {
@@ -332,6 +381,9 @@ function handleUserMessage(
   recorder: FlightRecorder,
   sessionId: string,
   data: { content?: unknown; source?: unknown; id?: string },
+  turn?: number,
+  step?: number,
+  agentId?: string,
 ): void {
   const trust = trustForMessageSource(data?.source)
   const excerpt = extractText(data?.content)
@@ -340,12 +392,17 @@ function handleUserMessage(
   const contextEvent = recorder.record(baseEvent({
     event_type: 'context.introduced',
     session: { id: sessionId },
+    turn,
+    step,
+    agent: agentId ? { id: agentId } : undefined,
     context: {
       id: ctxId,
       source_type: trust.source_type,
       source: trust.source,
       trust: trust.trust,
       excerpt,
+      turn,
+      step,
     },
     raw: { source_hook: 'session/event:user/message' },
   }))
@@ -356,6 +413,9 @@ function handleUserMessage(
       recorder.record(baseEvent({
         event_type: 'objective.captured',
         session: { id: sessionId },
+        turn,
+        step,
+        agent: agentId ? { id: agentId } : undefined,
         objective: { id: `obj_${sessionId}`, description: excerpt },
         links: { parent_event: contextEvent.id },
         raw: { source_hook: 'session/event:user/message:objective' },
@@ -382,7 +442,7 @@ function snapshotCapabilities(
       raw: { source_hook: 'agent/created:tools.schemas' },
     }))
   } catch {
-    // schemas() may require scope; ignore
+    // ignore
   }
 }
 

@@ -12,11 +12,14 @@ export interface PolicyRule {
 }
 
 export interface PolicyContext {
+  /** Same-turn untrusted context only. */
   hasUntrustedContext: boolean
   untrustedContextEventId?: string
+  turn?: number
   recentToolNames: string[]
   availableTools: string[]
   priorBlockEventId?: string
+  mcpTrust?: 'trusted' | 'untrusted' | 'unknown'
 }
 
 export interface PolicyVerdict {
@@ -48,6 +51,7 @@ export class PolicyEngine {
         agent: event.agent,
         tool: event.tool,
         action: event.action,
+        mcp: event.mcp,
         policy: {
           decision: rule.action,
           rule: rule.id,
@@ -56,7 +60,12 @@ export class PolicyEngine {
         },
         links: {
           policy_decision_for: event.id,
-          ...ctx.untrustedContextEventId ? { context_source: ctx.untrustedContextEventId } : {},
+          ...ctx.untrustedContextEventId
+            ? {
+              candidate_context_source: ctx.untrustedContextEventId,
+              correlated_with: ctx.untrustedContextEventId,
+            }
+            : {},
         },
         raw: { source_hook: 'harnesssec.policy' },
       })
@@ -80,7 +89,8 @@ export class PolicyEngine {
   private recordAftermath(blockedPolicyEventId: string, nextToolEvent: HarnessEvent): void {
     const session = this.recorder.getSession(nextToolEvent.session.id)
     const already = session?.events.some(
-      e => e.event_type === 'policy.aftermath' && e.links?.caused_by === blockedPolicyEventId,
+      e => e.event_type === 'policy.aftermath'
+        && (e.links?.correlated_with === blockedPolicyEventId || e.links?.caused_by === blockedPolicyEventId),
     )
     if (already) return
 
@@ -91,12 +101,13 @@ export class PolicyEngine {
       tool: nextToolEvent.tool,
       action: nextToolEvent.action,
       links: {
-        caused_by: blockedPolicyEventId,
+        // Temporal sequence after a block — correlation, not proven causal intent.
+        correlated_with: blockedPolicyEventId,
         parent_event: nextToolEvent.id,
       },
       raw: {
         source_hook: 'harnesssec.policy.aftermath',
-        notes: 'Agent requested another tool after a prior BLOCK',
+        notes: 'Agent requested another tool after a prior BLOCK (correlated, not caused_by)',
       },
     }))
   }
@@ -107,9 +118,26 @@ export class PolicyEngine {
     const agentId = event.agent?.id
     const agentEvents = events.filter(e => !agentId || e.agent?.id === agentId)
 
-    const untrusted = [...agentEvents].reverse().find(
-      e => e.event_type === 'context.introduced' && e.context?.trust === 'untrusted',
-    )
+    const turn = event.turn
+      ?? (typeof (event.action?.arguments as any)?.turn === 'number'
+        ? (event.action!.arguments as any).turn as number
+        : event.context?.turn)
+
+    let untrustedId: string | undefined
+    if (agentId && turn !== undefined) {
+      untrustedId = this.recorder.provenance.candidateUntrustedForStep(event.session.id, agentId, turn)
+    }
+
+    // Same-turn context.introduced events that haven't been indexed yet in provenance
+    // (e.g. recorded in same tick before observe) — fall back to scanning this turn's events.
+    if (!untrustedId && turn !== undefined) {
+      const sameTurn = [...agentEvents].reverse().find(e =>
+        e.event_type === 'context.introduced'
+        && e.context?.trust === 'untrusted'
+        && e.context.turn === turn,
+      )
+      untrustedId = sameTurn?.id
+    }
 
     const priorBlock = [...agentEvents].reverse().find(
       e => e.event_type === 'policy.decision' && e.policy?.decision === 'block',
@@ -126,11 +154,13 @@ export class PolicyEngine {
       : []
 
     return {
-      hasUntrustedContext: !!untrusted,
-      untrustedContextEventId: untrusted?.id,
+      hasUntrustedContext: !!untrustedId,
+      untrustedContextEventId: untrustedId,
+      turn,
       recentToolNames,
       availableTools,
       priorBlockEventId: priorBlock?.id,
+      mcpTrust: event.mcp?.trust,
     }
   }
 }

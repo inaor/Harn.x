@@ -118,7 +118,7 @@ async function main(): Promise<void> {
     console.log(`Rules loaded from defaultRules (store=${dir})`)
     console.log('- credential-path-in-shell-args  [BLOCK]')
     console.log('- untrusted-context-sensitive-tool  [BLOCK]')
-    console.log('- unknown-mcp-tool-use  [ALERT]')
+    console.log('- untrusted-mcp-tool-use  [ALERT] (explicit untrusted only)')
     return
   }
 

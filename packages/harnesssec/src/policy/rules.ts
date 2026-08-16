@@ -53,24 +53,25 @@ export const credentialPathInShellArgs: PolicyRule = {
   },
 }
 
-/** Unknown MCP server tool use — alert (block optional). */
-export const unknownMcpToolUse: PolicyRule = {
-  id: 'unknown-mcp-tool-use',
+/** MCP tool use — alert only when server trust is untrusted (not merely unknown). */
+export const untrustedMcpToolUse: PolicyRule = {
+  id: 'untrusted-mcp-tool-use',
   title: 'Untrusted MCP Tool Invocation',
-  severity: 'medium',
+  severity: 'high',
   action: 'alert',
-  match(event) {
+  match(event, ctx) {
     if (event.event_type !== 'tool.requested') return false
-    return isMcpToolName(event.tool?.name ?? '')
+    if (!isMcpToolName(event.tool?.name ?? '')) return false
+    return (event.mcp?.trust ?? ctx.mcpTrust) === 'untrusted'
   },
   reason(event) {
     const parsed = parseMcpToolName(event.tool?.name ?? '')
-    return `MCP tool requested server=${parsed?.server ?? '?'} tool=${parsed?.tool ?? event.tool?.name}`
+    return `Untrusted MCP tool server=${parsed?.server ?? '?'} tool=${parsed?.tool ?? event.tool?.name} trust=untrusted`
   },
 }
 
 export const defaultRules: PolicyRule[] = [
   credentialPathInShellArgs,
   untrustedContextSensitiveTool,
-  unknownMcpToolUse,
+  untrustedMcpToolUse,
 ]

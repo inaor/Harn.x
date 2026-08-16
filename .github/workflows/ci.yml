@@ -1,0 +1,31 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: packages/harnesssec
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: packages/harnesssec/package-lock.json
+      - run: npm ci
+      - run: npm run build
+      - run: npm test
+      - run: npm run test:integration
+      - name: Capture integration summary
+        run: |
+          node --import tsx --test tests/integration/*.test.ts 2>&1 | tee /tmp/harnx-integration.txt
+          echo '### Integration test output' >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          tail -40 /tmp/harnx-integration.txt >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
