@@ -10,17 +10,30 @@ function storeDir(flag?: string): string {
   return flag ?? join(homedir(), '.harnesssec', 'sessions')
 }
 
-function argValue(args: string[], name: string): string | undefined {
-  const i = args.indexOf(name)
-  if (i >= 0 && args[i + 1]) return args[i + 1]
-  return undefined
+/** Strip `--store <dir>` (and other flags later) so `cmd` is the real subcommand. */
+function parseArgs(argv: string[]): { cmd?: string; rest: string[]; store?: string } {
+  const rest: string[] = []
+  let store: string | undefined
+  for (let i = 0; i < argv.length; i++) {
+    const a = argv[i]
+    if (a === '--store') {
+      store = argv[++i]
+      continue
+    }
+    if (a === '--help' || a === '-h') {
+      rest.push('help')
+      continue
+    }
+    rest.push(a)
+  }
+  return { cmd: rest[0], rest: rest.slice(1), store }
 }
 
 async function main(): Promise<void> {
-  const [cmd, ...rest] = process.argv.slice(2)
-  const dir = storeDir(argValue(process.argv, '--store'))
+  const { cmd, rest, store } = parseArgs(process.argv.slice(2))
+  const dir = storeDir(store)
 
-  if (!cmd || cmd === 'help' || cmd === '--help') {
+  if (!cmd || cmd === 'help') {
     printHelp()
     return
   }
@@ -41,15 +54,15 @@ async function main(): Promise<void> {
   }
 
   if (cmd === 'demo') {
-    const out = join(dir, '..', 'demo-run')
-    rmSync(out, { recursive: true, force: true })
-    mkdirSync(out, { recursive: true })
-    const result = runAttackDemo(out)
+    mkdirSync(dir, { recursive: true })
+    // Replace prior attack-demo artifact so replay is deterministic.
+    rmSync(join(dir, 'attack-demo.json'), { force: true })
+    const result = runAttackDemo(dir)
     console.log(result.summary)
     console.log('')
     console.log(renderReplay(result.recorder, result.sessionId))
     console.log('')
-    console.log(`Stored: ${join(out, `${result.sessionId}.json`)}`)
+    console.log(`Stored: ${join(dir, `${result.sessionId}.json`)}`)
     return
   }
 
