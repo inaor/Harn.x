@@ -81,6 +81,7 @@ export const untrustedMcpToolUse: PolicyRule = {
   },
 }
 
+/** Production / native default policy set. Lab rules are never included here. */
 export const defaultRules: PolicyRule[] = [
   credentialPathInShellArgs,
   untrustedContextSensitiveTool,

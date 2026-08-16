@@ -18,7 +18,7 @@ test('cursor: map Shell → bash', () => {
   assert.equal(mapCursorToolName('Read'), 'read')
 })
 
-test('cursor: beforeShellExecution blocks credential path (canonical deny)', () => {
+test('cursor: beforeShellExecution blocks credential path (production rule; separate SSH scenario)', () => {
   const dir = mkdtempSync(join(tmpdir(), 'harnx-cursor-'))
   try {
     const result = handleCursorHook({

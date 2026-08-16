@@ -119,6 +119,7 @@ async function main(): Promise<void> {
 
   if (cmd === 'cursor-hook') {
     const { handleCursorHook } = await import('../adapters/cursor/index.js')
+    const { resolveCursorHookRules } = await import('./cursor-lab-policy.js')
     const chunks: Buffer[] = []
     for await (const chunk of process.stdin) chunks.push(chunk as Buffer)
     const raw = Buffer.concat(chunks).toString('utf8')
@@ -135,7 +136,8 @@ async function main(): Promise<void> {
       process.exit(2)
     }
     try {
-      const result = handleCursorHook(event, dir)
+      // Lab env (HARNX_LAB_POLICY) is interpreted only at this CLI boundary.
+      const result = handleCursorHook(event, dir, resolveCursorHookRules())
       process.stdout.write(`${JSON.stringify(result.response)}\n`)
       process.exit(result.blocked ? 2 : 0)
     } catch (err) {
@@ -226,6 +228,12 @@ async function main(): Promise<void> {
     console.log('- credential-path-in-shell-args  [BLOCK]')
     console.log('- untrusted-context-sensitive-tool  [BLOCK]')
     console.log('- untrusted-mcp-tool-use  [ALERT] (explicit untrusted only)')
+    if (process.env.HARNX_LAB_POLICY === 'phase4a') {
+      console.log('')
+      console.log('Note: HARNX_LAB_POLICY=phase4a is set. It affects only cursor-hook')
+      console.log('(explicit injection of experimental phase4a lab rules), not defaultRules')
+      console.log('or DeepSeek/OpenHands adapters.')
+    }
     return
   }
 

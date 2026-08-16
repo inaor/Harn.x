@@ -2,8 +2,12 @@
  * Cursor Agent hook entry — stdin JSON → Harn.x → stdout JSON.
  * Exit 2 ≡ deny (Cursor + Claude Code compatible).
  * Prefer permission:"deny" in JSON; failClosed should be set in hooks.json.
+ *
+ * Lab policy composition (HARNX_LAB_POLICY) is resolved only here / in
+ * `harnesssec cursor-hook` — not inside adapter defaults.
  */
 import { handleCursorHook, type CursorHookEvent } from './index.js'
+import { resolveCursorHookRules } from '../../cli/cursor-lab-policy.js'
 
 async function readStdin(): Promise<string> {
   const chunks: Buffer[] = []
@@ -29,7 +33,7 @@ async function main(): Promise<void> {
   }
 
   try {
-    const result = handleCursorHook(event, storeDir)
+    const result = handleCursorHook(event, storeDir, resolveCursorHookRules())
     process.stdout.write(`${JSON.stringify(result.response)}\n`)
     process.exit(result.blocked ? 2 : 0)
   } catch (err) {

@@ -13,6 +13,7 @@ import { join } from 'node:path'
 import { homedir } from 'node:os'
 import { FlightRecorder } from '../../core/recorder.js'
 import { PolicyEngine } from '../../policy/engine.js'
+import type { PolicyRule } from '../../policy/engine.js'
 import { defaultRules } from '../../policy/rules.js'
 import { McpTrustRegistry, DEFAULT_MCP_TRUST } from '../../core/mcp-trust.js'
 import {
@@ -99,6 +100,7 @@ function saveMeta(storeDir: string, sessionId: string, meta: SessionMeta): void 
 export function createCursorRuntime(
   storeDir?: string,
   mcpTrust?: Record<string, TrustLevel>,
+  rules: PolicyRule[] = defaultRules,
 ): { recorder: FlightRecorder; policy: PolicyEngine; storeDir: string } {
   const dir = storeDir ?? join(homedir(), '.harnesssec', 'sessions')
   mkdirSync(dir, { recursive: true })
@@ -106,7 +108,7 @@ export function createCursorRuntime(
     dir,
     new McpTrustRegistry({ ...DEFAULT_MCP_TRUST, ...mcpTrust }),
   )
-  const policy = new PolicyEngine(recorder, defaultRules)
+  const policy = new PolicyEngine(recorder, rules)
   return { recorder, policy, storeDir: dir }
 }
 
@@ -243,8 +245,9 @@ function deny(
 export function handleCursorHook(
   event: CursorHookEvent,
   storeDir?: string,
+  rules: PolicyRule[] = defaultRules,
 ): CursorHookResult {
-  const { recorder, policy, storeDir: dir } = createCursorRuntime(storeDir)
+  const { recorder, policy, storeDir: dir } = createCursorRuntime(storeDir, undefined, rules)
   const sessionId = sessionIdOf(event)
   const recorded: HarnessEvent[] = []
   const meta = loadMeta(dir, sessionId)
