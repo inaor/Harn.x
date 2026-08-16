@@ -42,8 +42,13 @@ const harness = runFixture('harness-name-mismatch.json', (r) =>
 const vendor = runFixture('phase3-vendor-behavior.json', (r) =>
   r.findings.some((f) => /Vendor-specific branch in behavioral detection/i.test(f.message)))
 
+const phase32 = runFixture('phase32-claim-integrity.json', (r) =>
+  r.findings.some((f) =>
+    /Scripted\/injected post-block|Simulated lineage|benchmarks without|loosened to manufacture|overgeneralized/i.test(f.message)))
+
 console.log(JSON.stringify({
   ok: true,
   harness_name_mismatch: harness.verdict,
   phase3_vendor_behavior: vendor.verdict,
+  phase32_claim_integrity: phase32.verdict,
 }, null, 2))

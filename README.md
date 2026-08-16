@@ -211,6 +211,7 @@ Full contract: [`docs/architecture-contract.md`](docs/architecture-contract.md) 
 | 2 — OpenHands portability | **PASS** |
 | 2.1 — Provenance + Guardian | Complete |
 | 3 — Stateful behavioral detection | **PASS** (OH live lineage **PARTIAL**) |
+| 3.2 — Live autonomous post-denial proof | **FAIL** (no live model credentials this run) — [`docs/phase3.2-live-autonomy.md`](docs/phase3.2-live-autonomy.md) |
 | 3.5+ | Paused |
 
 Engineering phases are paused. This README reflects verified capabilities through Phase 3.

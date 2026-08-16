@@ -1,0 +1,9 @@
+{
+  "name": "harnx-live-autonomy",
+  "private": true,
+  "type": "module",
+  "description": "Phase 3.2 live autonomy experiment (not Harn.x core)",
+  "scripts": {
+    "run": "npm --prefix ../../packages/harnesssec run experiment:live-autonomy"
+  }
+}

@@ -67,7 +67,7 @@ export function renderIncident(store: IncidentSessionView, sessionId: string): s
 
     if (e.event_type === 'context.introduced' && e.context?.trust === 'untrusted') {
       lines.push(t)
-      lines.push('Untrusted context introduced')
+      lines.push('[OBSERVED] Untrusted context introduced')
       lines.push('')
       continue
     }
@@ -75,16 +75,19 @@ export function renderIncident(store: IncidentSessionView, sessionId: string): s
     if (e.event_type === 'tool.requested' && e.tool?.name) {
       const norm = normalizeAction(e as Parameters<typeof normalizeAction>[0])
       lines.push(t)
-      lines.push('Agent requested:')
-      lines.push(`${norm.category}${norm.target ? ` ${norm.target}` : ''}`)
-      lines.push(`via ${norm.capability}`)
+      lines.push('[OBSERVED] Agent requested tool:')
+      lines.push(e.tool.name)
+      lines.push(`[DERIVED] ${norm.category}${norm.target ? ` ${norm.target}` : ''} via ${norm.capability} (${norm.level})`)
+      if (e.links?.attempted_after || e.links?.correlated_with) {
+        lines.push('[CORRELATED] post-block / weak association link present')
+      }
       lines.push('')
       continue
     }
 
     if (e.event_type === 'policy.decision' && e.policy?.decision === 'block') {
       lines.push(t)
-      lines.push('BLOCKED')
+      lines.push('[OBSERVED] BLOCKED')
       if (e.policy.rule) lines.push(`rule: ${e.policy.rule}`)
       lines.push('')
       continue
@@ -92,7 +95,7 @@ export function renderIncident(store: IncidentSessionView, sessionId: string): s
 
     if (e.event_type === 'subagent.spawned') {
       lines.push(t)
-      lines.push('Agent delegated to:')
+      lines.push('[OBSERVED] Agent delegated to:')
       lines.push(e.agent?.id ?? '(child)')
       lines.push('')
       continue
@@ -100,6 +103,7 @@ export function renderIncident(store: IncidentSessionView, sessionId: string): s
 
     if (e.event_type === 'behavior.detection' && e.detection) {
       lines.push(t)
+      lines.push('[DERIVED] behavioral detection')
       if (e.detection.kind === 'agent.policy_circumvention') {
         lines.push('DETECTION:')
         lines.push('Alternate capability circumvention')

@@ -1,0 +1,65 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/inaor/Harn.x/experiments/live-autonomy/schema/result.schema.json",
+  "title": "Harn.x Phase 3.2 live autonomy results",
+  "oneOf": [
+    { "$ref": "#/$defs/run" },
+    { "$ref": "#/$defs/aggregate" }
+  ],
+  "$defs": {
+    "run": {
+      "type": "object",
+      "required": [
+        "schema_version",
+        "run_id",
+        "session_id",
+        "harness",
+        "autonomous",
+        "canonical",
+        "block_observed",
+        "reaction",
+        "detection_kinds"
+      ],
+      "properties": {
+        "schema_version": { "const": "phase3.2-run/v1" },
+        "run_id": { "type": "string" },
+        "session_id": { "type": "string" },
+        "harness": { "type": "string" },
+        "model": { "type": "string" },
+        "provider": { "type": "string" },
+        "autonomous": { "type": "boolean" },
+        "canonical": { "type": "boolean" },
+        "block_observed": { "type": "boolean" },
+        "reaction": {
+          "type": "string",
+          "enum": [
+            "STOPPED",
+            "RETRIED_IDENTICAL_ACTION",
+            "CHANGED_CAPABILITY",
+            "EQUIVALENT_ACTION",
+            "DELEGATED",
+            "CHANGED_OBJECTIVE",
+            "UNKNOWN"
+          ]
+        },
+        "detection_kinds": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "skipped": { "type": "boolean" },
+        "skip_reason": { "type": "string" }
+      }
+    },
+    "aggregate": {
+      "type": "object",
+      "required": ["schema_version", "harness", "runs", "reaction_distribution"],
+      "properties": {
+        "schema_version": { "const": "phase3.2-aggregate/v1" },
+        "harness": { "type": "string" },
+        "runs": { "type": "integer", "minimum": 0 },
+        "reaction_distribution": { "type": "object" },
+        "behavioral_detections": { "type": "integer" }
+      }
+    }
+  }
+}

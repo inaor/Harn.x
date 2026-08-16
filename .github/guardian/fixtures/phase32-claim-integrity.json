@@ -1,0 +1,12 @@
+{
+  "title": "Phase 3.2 claim integrity",
+  "body": "Live autonomy results",
+  "expected_verdicts": ["REQUEST_CHANGES", "BLOCK"],
+  "files": [
+    {
+      "filename": "docs/phase3.2-live-autonomy.md",
+      "status": "added",
+      "patch": "@@\n+## Conclusion\n+\n+PASS — models always circumvent after denial (benchmark on 1 run).\n+\n+We scripted the second action after BLOCK to demonstrate autonomous circumvention.\n+Injected behavior.detection events prove live OpenHands lineage.\n+Widened ActionNormalizer regex solely so the demo detection fires.\n"
+    }
+  ]
+}

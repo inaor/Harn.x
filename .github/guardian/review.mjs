@@ -85,6 +85,67 @@ function isTestPath(name) {
 }
 
 /**
+ * Phase 3.2 — prevent experimental claims from becoming product claims.
+ * @param {PrFile[]} files
+ * @param {Finding[]} findings
+ * @param {string} allAdded
+ * @param {string[]} names
+ */
+export function checkPhase32ExperimentClaims(files, findings, allAdded, names) {
+  const touchesPhase32Docs = names.some((n) => /phase3\.2|live-autonomy/i.test(n))
+  const touchesExperiment = names.some((n) => n.includes('experiments/live-autonomy/'))
+  if (!touchesPhase32Docs && !touchesExperiment && !/live autonomy|post-denial|autonomous post/i.test(allAdded)) {
+    return
+  }
+
+  if (/scripted (the )?second action|scripted_followup|inject(?:ed)? (?:post-block|behavior)|MockAdapter.*autonomous|prescribed Action B/i.test(allAdded)
+    && /autonomous|live (?:evidence|proof)|PASS/i.test(allAdded)) {
+    findings.push({
+      severity: 'BLOCKER',
+      file: 'docs/phase3.2',
+      message: 'Scripted/injected post-block action presented as autonomous live evidence',
+    })
+  }
+
+  if (/simulated lineage|fabricated (?:spawn|subagent)|parent_agent_id alone.*live lineage/i.test(allAdded)
+    && /live (?:OpenHands )?lineage|PASS/i.test(allAdded)) {
+    findings.push({
+      severity: 'BLOCKER',
+      file: 'docs/phase3.2',
+      message: 'Simulated lineage presented as live lineage evidence',
+    })
+  }
+
+  if (/\bbenchmark\b/i.test(allAdded) && /phase\s*3\.2|live autonomy/i.test(allAdded)
+    && !/not (?:a |treat.*as )?benchmark|exploratory|insufficient sample/i.test(allAdded)) {
+    findings.push({
+      severity: 'HIGH',
+      file: 'docs/phase3.2',
+      message: 'Experiment results described as benchmarks without sufficient methodology caveats',
+    })
+  }
+
+  if (/one (?:successful )?run|n\s*=\s*1/i.test(allAdded)
+    && /general (?:model )?behavior|models always|typical agent/i.test(allAdded)) {
+    findings.push({
+      severity: 'HIGH',
+      file: 'docs/phase3.2',
+      message: 'Single-run result overgeneralized as model behavior',
+    })
+  }
+
+  if (/widen(?:ed)?|loosen(?:ed)?|broader regex|fuzzy (?:string )?match|LLM semantic equivalence/i.test(allAdded)
+    && /normaliz|ActionNormalizer|BehavioralEngine|detection/i.test(allAdded)
+    && /demo|experiment|phase\s*3\.2/i.test(allAdded)) {
+    findings.push({
+      severity: 'BLOCKER',
+      file: 'diff',
+      message: 'Normalization/detection loosened to manufacture Phase 3.2 detections',
+    })
+  }
+}
+
+/**
  * Phase 3 Guardian checks for behavioral detection quality.
  * @param {PrFile[]} files
  * @param {string} root
@@ -368,6 +429,7 @@ export function review(files, contractText, opts = {}) {
 
   // Phase 3 behavioral quality checks
   checkPhase3Behavior(files, root, findings, allAdded, names)
+  checkPhase32ExperimentClaims(files, findings, allAdded, names)
 
   // Blind spot / bypass docs when adapter execution paths change
   const adapterExec = names.some((n) => /adapters\/.*\.(ts|js)$/.test(n) && !isTestPath(n))

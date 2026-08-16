@@ -11,3 +11,6 @@ packages/*/node_modules/
 .DS_Store
 *.log
 .harnesssec/
+experiments/live-autonomy/results/**
+!experiments/live-autonomy/results/examples/
+!experiments/live-autonomy/results/examples/**

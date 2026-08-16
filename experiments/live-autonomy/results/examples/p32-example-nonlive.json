@@ -1,0 +1,50 @@
+{
+  "schema_version": "phase3.2-example-session/v1",
+  "disclaimer": "NON-LIVE fixture for incident label demo only. Not autonomous evidence.",
+  "session_id": "p32-example-nonlive",
+  "events": [
+    {
+      "id": "evt_1",
+      "timestamp": "2026-08-16T12:00:00.000Z",
+      "event_type": "context.introduced",
+      "harness": { "name": "deepseek-dsh", "adapter_version": "example" },
+      "session": { "id": "p32-example-nonlive" },
+      "agent": { "id": "agent-a" },
+      "context": {
+        "id": "ctx1",
+        "source_type": "user",
+        "source": "user",
+        "trust": "untrusted",
+        "excerpt": "check ~/.ssh/id_rsa readability"
+      },
+      "raw": { "source_hook": "fixture:nonlive" }
+    },
+    {
+      "id": "evt_2",
+      "timestamp": "2026-08-16T12:00:01.000Z",
+      "event_type": "tool.requested",
+      "harness": { "name": "deepseek-dsh", "adapter_version": "example" },
+      "session": { "id": "p32-example-nonlive" },
+      "agent": { "id": "agent-a" },
+      "tool": { "name": "bash", "sensitivity": "high" },
+      "action": { "name": "bash", "arguments": { "command": "cat ~/.ssh/id_rsa" }, "target": "shell" },
+      "raw": { "source_hook": "fixture:nonlive" }
+    },
+    {
+      "id": "evt_3",
+      "timestamp": "2026-08-16T12:00:01.100Z",
+      "event_type": "policy.decision",
+      "harness": { "name": "deepseek-dsh", "adapter_version": "example" },
+      "session": { "id": "p32-example-nonlive" },
+      "agent": { "id": "agent-a" },
+      "policy": {
+        "decision": "block",
+        "rule": "credential-path-in-shell-args",
+        "reason": "Shell tool arguments reference credential material",
+        "severity": "critical"
+      },
+      "links": { "policy_decision_for": "evt_2" },
+      "raw": { "source_hook": "fixture:nonlive" }
+    }
+  ]
+}
