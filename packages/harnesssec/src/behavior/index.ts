@@ -27,5 +27,6 @@ export {
 } from './detections.js'
 export type { DetectionHit, DetectionKind } from './detections.js'
 export { BehavioralEngine } from './engine.js'
+export type { LineageNode } from './engine.js'
 export { buildDetectionEvent } from './emit.js'
 export { renderIncident } from './render.js'

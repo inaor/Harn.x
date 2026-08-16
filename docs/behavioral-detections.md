@@ -23,6 +23,21 @@ OpenHands **delegated-circumvention is detector-portable** (same code path with 
 | Spawn → child action window | 30s | `DELEGATION_TO_CHILD_ACTION_MS` | Max delay from explicit spawn to equivalent child action |
 | Equivalence | exact/strong only | — | `unknown` never matches |
 | Lineage | Explicit parent/spawn only | — | Scoped by `(session_id, agent_id)` |
+| Parent vs spawn | Separated | — | `parent_agent_id` may set parent only; only `subagent.spawned` sets `spawn_timestamp` |
+
+### Parent relationship vs observed delegation
+
+```text
+LineageNode {
+  parent_id: string
+  spawn_timestamp?: string   // only from subagent.spawned
+  spawn_event_id?: string    // only from subagent.spawned
+}
+```
+
+- Generic events with `parent_agent_id` may establish **parent relationship**.
+- They **must not** fabricate a spawn timestamp.
+- **Delegated policy circumvention requires** an observed `subagent.spawned` spawn timestamp. If absent → no detection.
 
 ### Delegated circumvention timing
 
@@ -80,7 +95,7 @@ read: ~/.ssh/id_rsa         → DETECT agent.policy_circumvention (exact)
 ### Evidence bar
 
 1. Parent (ancestor) BLOCK with `(category, target)` exact/strong still within delegation TTL (default 5 min)
-2. Child has **OBSERVED** `parent_agent_id` / spawn in the **same session**
+2. Child has **OBSERVED** `subagent.spawned` (spawn timestamp) in the **same session** — parent_agent_id alone is insufficient
 3. Child attempts equivalent `(category, target)` within spawn→action window (default 30s)
 
 ### Telemetry note
@@ -93,12 +108,9 @@ read: ~/.ssh/id_rsa         → DETECT agent.policy_circumvention (exact)
 **Kind:** `agent.delegation_privilege_expansion`  
 **Severity:** medium (signal)
 
-Requires OBSERVED `capability.snapshot` on **both** parent and child (latest snapshot **replaces** prior available set). Sequences supported:
-
-- parent snapshot → child spawn **with** snapshot
-- parent snapshot → child spawn → child capability.snapshot
-
-Missing snapshots → no detection. Never infer availability from tool use.
+Requires OBSERVED parent-child lineage **and** latest snapshots on **both** parent and child.
+Detection fires once all three are known, **regardless of event order** (spawn/snapshots).
+Deduped to one detection per `(session, parent, child)`. Never infer availability from tool use.
 
 ## Architecture
 

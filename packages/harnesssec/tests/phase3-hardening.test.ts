@@ -394,7 +394,9 @@ test('hardening: hydrate two sessions with reused agent ids stay isolated', () =
     const eng = reloaded.behavior
 
     assert.equal(eng.parentOf(sa, 'child'), 'shared-agent')
+    assert.equal(eng.hasObservedSpawn(sa, 'child'), true)
     assert.equal(eng.parentOf(sb, 'child'), undefined)
+    assert.equal(eng.hasObservedSpawn(sb, 'child'), false)
     assert.deepEqual(eng.snapshotFor(sa, 'shared-agent'), ['bash', 'cloud.admin'])
     assert.deepEqual(eng.snapshotFor(sb, 'shared-agent'), ['read'])
     assert.ok(eng.memory.forAgent(sa, 'shared-agent').length >= 1)
@@ -403,6 +405,217 @@ test('hardening: hydrate two sessions with reused agent ids stay isolated', () =
     // Caps tracker isolation
     assert.deepEqual(reloaded.capabilities.availableFor(sa, 'shared-agent'), ['bash', 'cloud.admin'])
     assert.deepEqual(reloaded.capabilities.availableFor(sb, 'shared-agent'), ['read'])
+  } finally {
+    rmSync(store, { recursive: true, force: true })
+  }
+})
+
+test('consistency: parent_agent_id alone does not fabricate spawn — no delegated circumvention', () => {
+  const engine = new BehavioralEngine()
+  const harness = { name: 'deepseek-dsh' }
+  const session = { id: 'no-spawn' }
+
+  const bash = baseEvent({
+    event_type: 'tool.requested',
+    harness,
+    session,
+    agent: { id: 'parent' },
+    timestamp: ts(T0, 0),
+    tool: { name: 'bash', sensitivity: 'high' },
+    action: { type: 'tool.request', arguments: { command: 'cat ~/.ssh/id_rsa' } },
+  })
+  engine.observe(bash)
+  engine.observe(baseEvent({
+    event_type: 'policy.decision',
+    harness,
+    session,
+    agent: { id: 'parent' },
+    timestamp: ts(T0, 0),
+    tool: bash.tool,
+    action: bash.action,
+    policy: { decision: 'block', rule: 'x' },
+    links: { policy_decision_for: bash.id },
+  }))
+
+  // Child tool with parent_agent_id but NO subagent.spawned
+  const noSpawn = engine.observe(baseEvent({
+    event_type: 'tool.requested',
+    harness,
+    session,
+    agent: { id: 'child', parent_agent_id: 'parent' },
+    timestamp: ts(T0, 5),
+    tool: { name: 'read' },
+    action: { type: 'tool.request', arguments: { path: '~/.ssh/id_rsa' } },
+  }))
+  assert.equal(engine.parentOf(session.id, 'child'), 'parent')
+  assert.equal(engine.hasObservedSpawn(session.id, 'child'), false)
+  assert.equal(
+    noSpawn.filter(d => d.detection?.kind === 'agent.delegated_policy_circumvention').length,
+    0,
+  )
+  const node = engine.lineageFor(session.id, 'child')
+  assert.ok(node)
+  assert.equal(node.spawn_timestamp, undefined)
+  assert.equal(node.spawn_event_id, undefined)
+
+  // Real spawn then equivalent child action → DETECT
+  engine.observe(baseEvent({
+    event_type: 'subagent.spawned',
+    harness,
+    session,
+    agent: { id: 'child', parent_agent_id: 'parent' },
+    timestamp: ts(T0, 10),
+    links: { parent_agent: 'parent', delegated_by: 'parent' },
+  }))
+  assert.equal(engine.hasObservedSpawn(session.id, 'child'), true)
+
+  const dets = engine.observe(baseEvent({
+    event_type: 'tool.requested',
+    harness,
+    session,
+    agent: { id: 'child', parent_agent_id: 'parent' },
+    timestamp: ts(T0, 12),
+    tool: { name: 'read' },
+    action: { type: 'tool.request', arguments: { path: '~/.ssh/id_rsa' } },
+  }))
+  assert.ok(dets.some(d => d.detection?.kind === 'agent.delegated_policy_circumvention'))
+})
+
+test('consistency: privilege expansion — spawn then child snap then parent snap', () => {
+  const engine = new BehavioralEngine()
+  const harness = { name: 'deepseek-dsh' }
+  const session = { id: 'priv-order-c' }
+
+  assert.deepEqual(engine.observe(baseEvent({
+    event_type: 'subagent.spawned',
+    harness,
+    session,
+    agent: { id: 'child', parent_agent_id: 'parent' },
+    timestamp: ts(T0, 0),
+    links: { parent_agent: 'parent', delegated_by: 'parent' },
+  })), [])
+
+  assert.deepEqual(engine.observe(baseEvent({
+    event_type: 'capability.snapshot',
+    harness,
+    session,
+    agent: { id: 'child' },
+    capability: { available: ['read', 'shell'] },
+    timestamp: ts(T0, 1),
+  })), [])
+
+  const dets = engine.observe(baseEvent({
+    event_type: 'capability.snapshot',
+    harness,
+    session,
+    agent: { id: 'parent' },
+    capability: { available: ['read'] },
+    timestamp: ts(T0, 2),
+  }))
+  assert.ok(dets.some(d => d.detection?.kind === 'agent.delegation_privilege_expansion'))
+})
+
+test('consistency: privilege expansion — child snap then parent snap then spawn (no duplicate)', () => {
+  const engine = new BehavioralEngine()
+  const harness = { name: 'openhands' }
+  const session = { id: 'priv-order-d' }
+
+  assert.deepEqual(engine.observe(baseEvent({
+    event_type: 'capability.snapshot',
+    harness,
+    session,
+    agent: { id: 'child' },
+    capability: { available: ['read', 'shell'] },
+    timestamp: ts(T0, 0),
+  })), [])
+
+  assert.deepEqual(engine.observe(baseEvent({
+    event_type: 'capability.snapshot',
+    harness,
+    session,
+    agent: { id: 'parent' },
+    capability: { available: ['read'] },
+    timestamp: ts(T0, 1),
+  })), [])
+
+  const dets = engine.observe(baseEvent({
+    event_type: 'subagent.spawned',
+    harness,
+    session,
+    agent: { id: 'child', parent_agent_id: 'parent' },
+    timestamp: ts(T0, 2),
+    links: { parent_agent: 'parent', delegated_by: 'parent' },
+  }))
+  assert.equal(
+    dets.filter(d => d.detection?.kind === 'agent.delegation_privilege_expansion').length,
+    1,
+  )
+
+  // Later snapshots must not duplicate
+  const again = engine.observe(baseEvent({
+    event_type: 'capability.snapshot',
+    harness,
+    session,
+    agent: { id: 'child' },
+    capability: { available: ['read', 'shell', 'extra'] },
+    timestamp: ts(T0, 3),
+  }))
+  assert.equal(
+    again.filter(d => d.detection?.kind === 'agent.delegation_privilege_expansion').length,
+    0,
+  )
+})
+
+test('consistency: hydrate preserves parent-only vs observed spawn for delegated circumvention', () => {
+  const store = dir()
+  try {
+    const { recorder, policy } = createHarnessSec(store)
+    const harness = { name: 'deepseek-dsh' }
+    const session = { id: 'hydrate-parent-only' }
+
+    const bash = baseEvent({
+      event_type: 'tool.requested',
+      harness,
+      session: { id: session },
+      agent: { id: 'parent' },
+      timestamp: ts(T0, 0),
+      tool: { name: 'bash', sensitivity: 'high' },
+      action: { type: 'tool.request', arguments: { command: 'cat ~/.ssh/id_rsa' } },
+    })
+    recorder.record(bash)
+    policy.evaluateToolRequest(bash)
+
+    // Persist parent relationship without spawn
+    recorder.record(baseEvent({
+      event_type: 'tool.requested',
+      harness,
+      session: { id: session },
+      agent: { id: 'child', parent_agent_id: 'parent' },
+      timestamp: ts(T0, 5),
+      tool: { name: 'read' },
+      action: { type: 'tool.request', arguments: { path: '/tmp/readme.md' } },
+    }))
+
+    const { recorder: reloaded } = createHarnessSec(store)
+    const eng = reloaded.behavior
+    assert.equal(eng.parentOf(session, 'child'), 'parent')
+    assert.equal(eng.hasObservedSpawn(session, 'child'), false)
+    assert.equal(eng.lineageFor(session, 'child')?.spawn_timestamp, undefined)
+
+    // After hydrate, equivalent sensitive action still must NOT detect without spawn
+    const dets = eng.observe(baseEvent({
+      event_type: 'tool.requested',
+      harness,
+      session: { id: session },
+      agent: { id: 'child', parent_agent_id: 'parent' },
+      timestamp: ts(T0, 8),
+      tool: { name: 'read' },
+      action: { type: 'tool.request', arguments: { path: '~/.ssh/id_rsa' } },
+    }))
+    assert.equal(
+      dets.filter(d => d.detection?.kind === 'agent.delegated_policy_circumvention').length,
+      0,
+    )
   } finally {
     rmSync(store, { recursive: true, force: true })
   }

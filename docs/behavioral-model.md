@@ -84,8 +84,10 @@ This is behavioral memory for subsequent CORRELATED matches — not a claim of u
 
 ## Lineage rule
 
-Parent→child edges require explicit OBSERVED parent linkage.
+Parent→child edges require explicit OBSERVED parent linkage (`parent_agent_id` / links).
 **Never** infer lineage from timestamps alone.
+
+Observed **delegation/spawn** is stricter: only the normalized `subagent.spawned` event may set `spawn_timestamp` / `spawn_event_id`. Parent relationship alone does not count as observed delegation for delegated circumvention.
 
 ## Relationship types on the graph
 

@@ -13,10 +13,14 @@ function agentKey(sessionId: string, agentId: string): string {
   return `${sessionId}\0${agentId}`
 }
 
-interface LineageNode {
+/**
+ * Parent relationship is separate from observed delegation/spawn.
+ * Only `subagent.spawned` may set spawn_timestamp / spawn_event_id.
+ */
+export interface LineageNode {
   parent_id: string
-  spawn_timestamp: string
-  spawn_event_id: string
+  spawn_timestamp?: string
+  spawn_event_id?: string
 }
 
 /**
@@ -48,7 +52,11 @@ export class BehavioralEngine {
         this.rememberBlock(event)
       }
       if (event.event_type === 'behavior.detection' && event.detection) {
-        this.raised.add(this.detectionKey(event.detection.kind, event.detection.evidence))
+        this.raised.add(this.detectionKey(
+          event.detection.kind,
+          event.detection.evidence,
+          event.session.id,
+        ))
       }
     }
   }
@@ -58,7 +66,11 @@ export class BehavioralEngine {
     if (event.event_type === 'behavior.detection') {
       this.indexLocal(event)
       if (event.detection) {
-        this.raised.add(this.detectionKey(event.detection.kind, event.detection.evidence))
+        this.raised.add(this.detectionKey(
+          event.detection.kind,
+          event.detection.evidence,
+          event.session.id,
+        ))
       }
       return []
     }
@@ -68,11 +80,12 @@ export class BehavioralEngine {
     const out: HarnessEvent[] = []
     try {
       this.indexLocal(event)
+      const sessionId = event.session.id
 
       if (event.event_type === 'capability.snapshot' && event.agent?.id && event.capability?.available) {
-        this.setSnapshot(event.session.id, event.agent.id, event.capability.available)
-        for (const hit of this.privilegeHitsForAgent(event.session.id, event.agent.id, event)) {
-          const det = this.toDetection(hit, event)
+        this.setSnapshot(sessionId, event.agent.id, event.capability.available)
+        for (const hit of this.privilegeHitsAfterSnapshot(sessionId, event.agent.id, event)) {
+          const det = this.toDetection(hit, event, sessionId)
           if (det) out.push(det)
         }
       }
@@ -83,15 +96,15 @@ export class BehavioralEngine {
       }
 
       if (event.event_type === 'subagent.spawned' && event.agent?.id) {
-        for (const hit of this.privilegeHitsForAgent(event.session.id, event.agent.id, event)) {
-          const det = this.toDetection(hit, event)
+        for (const hit of this.privilegeHitsForChild(sessionId, event.agent.id, event)) {
+          const det = this.toDetection(hit, event, sessionId)
           if (det) out.push(det)
         }
       }
 
       if (event.event_type === 'tool.requested' && event.tool?.name) {
         for (const hit of this.circumventionHits(event)) {
-          const det = this.toDetection(hit, event)
+          const det = this.toDetection(hit, event, sessionId)
           if (det) out.push(det)
         }
       }
@@ -102,14 +115,26 @@ export class BehavioralEngine {
     return out
   }
 
-  /** Session-scoped parent lookup. */
+  /** Session-scoped parent lookup (relationship only — may lack spawn). */
   parentOf(sessionId: string, agentId: string): string | undefined {
     return this.lineageByChild.get(agentKey(sessionId, agentId))?.parent_id
+  }
+
+  /** True only when a real subagent.spawned was observed for this child. */
+  hasObservedSpawn(sessionId: string, agentId: string): boolean {
+    const node = this.lineageByChild.get(agentKey(sessionId, agentId))
+    return Boolean(node?.spawn_timestamp && node?.spawn_event_id)
   }
 
   /** Test/helper: latest snapshot for (session, agent). */
   snapshotFor(sessionId: string, agentId: string): string[] {
     return [...(this.snapshotByAgent.get(agentKey(sessionId, agentId)) ?? [])]
+  }
+
+  /** Test/helper: lineage node for (session, child). */
+  lineageFor(sessionId: string, agentId: string): LineageNode | undefined {
+    const node = this.lineageByChild.get(agentKey(sessionId, agentId))
+    return node ? { ...node } : undefined
   }
 
   private setSnapshot(sessionId: string, agentId: string, available: string[]): void {
@@ -136,13 +161,21 @@ export class BehavioralEngine {
       if (event.capability?.available) {
         this.setSnapshot(sessionId, agentId, event.capability.available)
       }
-    } else if (parentId && !this.lineageByChild.has(k)) {
-      // Parent link without spawn timestamp — record parent only if spawn unknown.
-      this.lineageByChild.set(k, {
-        parent_id: parentId,
-        spawn_timestamp: event.timestamp,
-        spawn_event_id: event.id,
-      })
+      return
+    }
+
+    if (parentId) {
+      const prev = this.lineageByChild.get(k)
+      if (prev) {
+        // Update parent relationship only — never fabricate spawn from this event.
+        this.lineageByChild.set(k, {
+          parent_id: parentId,
+          spawn_timestamp: prev.spawn_timestamp,
+          spawn_event_id: prev.spawn_event_id,
+        })
+      } else {
+        this.lineageByChild.set(k, { parent_id: parentId })
+      }
     }
   }
 
@@ -188,7 +221,8 @@ export class BehavioralEngine {
     if (alt) hits.push(alt)
 
     const lineage = this.lineageByChild.get(agentKey(sessionId, agentId))
-    if (lineage) {
+    // Delegated circumvention requires OBSERVED spawn/delegation timestamp.
+    if (lineage?.spawn_timestamp && lineage.spawn_event_id) {
       const del = findDelegatedPolicyCircumvention({
         memory: this.memory,
         sessionId,
@@ -204,26 +238,47 @@ export class BehavioralEngine {
     return hits
   }
 
-  private privilegeHitsForAgent(
+  /**
+   * After a snapshot: evaluate the agent as a child, and if it is a parent,
+   * evaluate all known children (order-independent).
+   */
+  private privilegeHitsAfterSnapshot(
     sessionId: string,
     agentId: string,
     trigger: HarnessEvent,
   ): DetectionHit[] {
-    const lineage = this.lineageByChild.get(agentKey(sessionId, agentId))
+    const hits: DetectionHit[] = []
+    hits.push(...this.privilegeHitsForChild(sessionId, agentId, trigger))
+    for (const [k, node] of this.lineageByChild) {
+      if (!k.startsWith(`${sessionId}\0`)) continue
+      if (node.parent_id !== agentId) continue
+      const childId = k.slice(sessionId.length + 1)
+      hits.push(...this.privilegeHitsForChild(sessionId, childId, trigger))
+    }
+    return hits
+  }
+
+  private privilegeHitsForChild(
+    sessionId: string,
+    childId: string,
+    trigger: HarnessEvent,
+  ): DetectionHit[] {
+    const lineage = this.lineageByChild.get(agentKey(sessionId, childId))
     if (!lineage) return []
     const parentId = lineage.parent_id
 
     const parentCaps = this.snapshotByAgent.get(agentKey(sessionId, parentId))
-    const childCaps = this.snapshotByAgent.get(agentKey(sessionId, agentId))
+    const childCaps = this.snapshotByAgent.get(agentKey(sessionId, childId))
     if (!parentCaps?.length || !childCaps?.length) return []
 
+    const spawnEventId = lineage.spawn_event_id ?? `lineage:${sessionId}:${parentId}:${childId}`
     const hit = findDelegationPrivilegeExpansion({
       parentAgentId: parentId,
-      childAgentId: agentId,
+      childAgentId: childId,
       parentAvailable: parentCaps,
       childAvailable: childCaps,
       sessionId,
-      spawnEventId: lineage.spawn_event_id,
+      spawnEventId,
       timestamp: trigger.timestamp,
     })
     return hit ? [hit] : []
@@ -232,15 +287,21 @@ export class BehavioralEngine {
   private detectionKey(
     kind: string,
     evidence: { blocked_event_id: string; action_event_id: string; parent_agent_id?: string; child_agent_id?: string },
+    sessionId: string,
   ): string {
     if (kind === 'agent.delegation_privilege_expansion') {
-      return `${kind}|${evidence.parent_agent_id ?? ''}|${evidence.child_agent_id ?? ''}|${evidence.blocked_event_id}`
+      // Stable across event order — one detection per parent/child/session.
+      return `${kind}|${sessionId}|${evidence.parent_agent_id ?? ''}|${evidence.child_agent_id ?? ''}`
     }
     return `${kind}|${evidence.blocked_event_id}|${evidence.action_event_id}`
   }
 
-  private toDetection(hit: DetectionHit, trigger: HarnessEvent): HarnessEvent | undefined {
-    const key = this.detectionKey(hit.kind, hit.evidence)
+  private toDetection(
+    hit: DetectionHit,
+    trigger: HarnessEvent,
+    sessionId: string,
+  ): HarnessEvent | undefined {
+    const key = this.detectionKey(hit.kind, hit.evidence, sessionId)
     if (this.raised.has(key)) return undefined
     this.raised.add(key)
     return buildDetectionEvent(hit, trigger)

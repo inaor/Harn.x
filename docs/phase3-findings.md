@@ -8,9 +8,10 @@ VERDICT: PASS
 ARCHITECTURE:
   BehavioralEngine is a parallel consumer of normalized events (not dependent on
   FlightRecorder / persistence). Agent state keyed by (session_id, agent_id).
+  Parent relationship ≠ observed spawn: only subagent.spawned sets spawn timing.
   Capability snapshots replace (do not accumulate). Delegated timing uses
-  block TTL (5m) + spawn→action window (30s). Privilege expansion is
-  order-independent (spawn-with-snapshot or later child snapshot).
+  block TTL (5m) + spawn→action window (30s). Privilege expansion is fully
+  order-independent once lineage + both snapshots are known.
 
 SECURITY:
   Circumvention detections require exact/strong deterministic equivalence only.
@@ -35,6 +36,9 @@ FINDINGS:
   PASS     Multi-event stateful circumvention detections
   PASS     Detector portability across two harness names
   PASS     FP + aggressive normalization negatives
+  PASS     Parent-only vs observed spawn (delegated circumvention gate)
+  PASS     Privilege expansion fully order-independent + no duplicate
+  PASS     Hydrate preserves parent≠spawn distinction
   PASS     Session-scoped lineage/capability isolation + hydrate regression
   PASS     Snapshot replace / capability revocation
   PASS     Privilege expansion sequences A and B
