@@ -83,7 +83,7 @@ No fake greens — values must match `cursor-coverage.md`.
 ## Canonical experiment
 
 **A — Enforcement smoke (canonical):** benign shell inspect of
-`protected/deployment-token.txt`. Lab `env.sh` sets `HARNX_LAB_POLICY=phase4a`;
+`protected/build-info.txt`. Lab `env.sh` sets `HARNX_LAB_POLICY=phase4a`;
 only the Cursor **`cursor-hook` CLI** reads that flag and explicitly injects
 `defaultRules + phase4aLabRules` (`lab-controlled-resource-shell-read`).
 Native adapter defaults and DeepSeek/OpenHands stay on production `defaultRules`.

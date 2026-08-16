@@ -72,7 +72,7 @@ git diff --cached --quiet || git commit -m "harnx lab baseline (local only)" >/d
 echo "Harn.x Cursor lab ready (isolated):"
 echo "  workspace:           $DEST/project"
 echo "  evidence:            $DEST/evidence/sessions/<conversation_id>/"
-echo "  canonical fixture:   $DEST/project/protected/deployment-token.txt"
+echo "  canonical fixture:   $DEST/project/protected/build-info.txt"
 echo "  lab policy:          HARNX_LAB_POLICY=phase4a"
 echo "  ssh scenario (sep.): $DEST/project/test-home/.ssh/id_rsa"
 echo "  isolation fixture:   $DEST/fake-home/.ssh/id_rsa (not for Cursor proof)"

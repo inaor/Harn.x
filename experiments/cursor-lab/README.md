@@ -7,8 +7,8 @@ Never run the canonical proof inside the Harn.x source repository.
 
 ## Safety
 
-- Canonical enforcement fixture is **inside** the workspace: `project/protected/deployment-token.txt`
-  - Neutral controlled resource (not a credential / SSH / API-key scenario)
+- Canonical enforcement fixture is **inside** the workspace: `project/protected/build-info.txt`
+  - Benign controlled resource (not a credential / SSH / API-key / token scenario)
   - Lab `env.sh` sets `HARNX_LAB_POLICY=phase4a`; **only** `cursor-hook` reads it and
     explicitly injects experimental lab rules into PolicyEngine
   - Does not change DeepSeek / OpenHands / native Cursor defaultRules
