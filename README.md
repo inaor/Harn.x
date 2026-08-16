@@ -1,235 +1,238 @@
 # Harn.x
 
-Harness-native flight recorder and pre-execution policy for AI agent harnesses.
+**Open behavioral security for autonomous agent harnesses.**
 
-> Models think. Harnesses act. We secure the execution layer.
+> Models think. Harnesses act. Harn.x secures the execution layer.
 
-Not an EDR. Not eBPF. Not a network proxy.
+**Record. Understand. Detect. Stop.**
 
-**Repo:** [github.com/inaor/Harn.x](https://github.com/inaor/Harn.x)
+[![CI](https://github.com/inaor/Harn.x/actions/workflows/ci.yml/badge.svg)](https://github.com/inaor/Harn.x/actions/workflows/ci.yml)
+[![Guardian](https://github.com/inaor/Harn.x/actions/workflows/guardian.yml/badge.svg)](https://github.com/inaor/Harn.x/actions/workflows/guardian.yml)
+![Node](https://img.shields.io/badge/node-%3E%3D20-22c55e)
+![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white)
+![Experimental](https://img.shields.io/badge/status-Experimental-critical)
+![DeepSeek DSH](https://img.shields.io/badge/adapter-DeepSeek%20DSH-22d3ee)
+![OpenHands](https://img.shields.io/badge/adapter-OpenHands-a78bfa)
+![Phase 3](https://img.shields.io/badge/phase-3%20behavioral-ec4899)
+
+**[Why Harn.x](#why-harnx)** · **[How it works](#how-it-works)** · **[Detections](#detections)** · **[Harness support](#harness-support)** · **[Quick start](#quick-start)** · **[Security model](#security-model)**
+
+<p align="center">
+  <img src="docs/assets/harnx-hero.svg" alt="Harn.x sits between the agent and tools — context, actions, policy, behavior, lineage — then ALLOW or BLOCK" width="920" />
+</p>
+
+Harn.x is an **experimental** open-source security layer for agent harnesses. It observes normalized harness semantics, records agent behavior, enforces pre-execution policy where the adapter allows it, and detects stateful behavioral patterns across a session.
+
+It is **not** an EDR replacement, SOAR, AI firewall, or production-ready platform for every agent.
 
 ---
 
-## What this proves
+## Why Harn.x?
 
-DeepSeek Harness already exposes tool intent **before** execution. Harn.x records that intent, links it to context provenance, and can **BLOCK** a dangerous tool call so the OS never sees a process.
+Traditional runtime security sees what executed — processes, files, sockets — after the fact.
 
-Classic PoC chain:
+Agent harnesses often hold additional security-relevant state *before* a tool runs: where context came from, which action was requested, who the agent is, whether a policy already blocked an equivalent request, what capabilities are available, and how the agent reacts after a deny. Endpoint and runtime telemetry generally cannot reconstruct all of that harness-native semantics reliably after execution.
+
+Harn.x sits at that layer: adapters normalize harness events; policy can decide **before** side effects; a behavioral engine correlates multi-step patterns that a single syscall never explains.
+
+<p align="center">
+  <img src="docs/assets/harnx-vs-runtime.svg" alt="Traditional runtime view versus Harn.x behavioral view" width="920" />
+</p>
+
+> Same execution environment. Different security context.
+
+---
+
+## See the behavior, not just the calls
+
+Phase 3 renders multi-event incidents from recorded sessions — policy blocks, alternate capabilities, and (when lineage is observed) delegated circumvention.
 
 ```text
-User: "Analyze this repository."
-        ↓
-Agent reads README.md
-        ↓
-README marked UNTRUSTED
-        ↓
-Agent requests: bash → cat ~/.ssh/id_rsa
-        ↓
-Harn.x BLOCK (before spawn)
-        ↓
-Agent tries an alternate tool
-        ↓
-Aftermath recorded → session replay
+$ harnesssec incident attack-demo
+
+HARN.X INCIDENT
+─────────────────────────────────────────────
+
+12:41:01  CONTEXT
+Untrusted context introduced
+
+12:41:05  ACTION
+READ_SENSITIVE_FILE ~/.ssh/id_rsa
+via shell
+
+12:41:05  POLICY
+BLOCKED — untrusted-context-sensitive-tool
+
+12:41:07  ACTION
+READ_SENSITIVE_FILE ~/.ssh/id_rsa
+via filesystem
+
+12:41:07  DETECTION
+Possible policy circumvention
+Alternate capability observed
+
+12:41:10  DELEGATION
+agent-a → agent-b
+
+12:41:12  ACTION
+agent-b requested equivalent sensitive action
+
+12:41:12  CRITICAL
+Delegated policy circumvention
+```
+
+```sh
+npm run cli -- incident <session>
+npm run cli -- detections <session>
 ```
 
 ---
 
-## Proof of concept (terminal)
+## How it works
 
-Requires Node 20+.
+<p align="center">
+  <img src="docs/assets/harnx-layers.svg" alt="Adapters to events to graph to policy to detect" width="920" />
+</p>
 
-### 1. Install
+| Layer | Role |
+|---|---|
+| **Adapters** | Map DeepSeek DSH / OpenHands hooks into normalized events |
+| **Event model** | Vendor-neutral harness semantics (context, tools, policy, subagents, …) |
+| **Graph / state** | Lineage and capability snapshots scoped by `(session_id, agent_id)` |
+| **Policy** | Pre-execution ALLOW / BLOCK where the harness seam supports deny |
+| **Behavior** | Stateful detectors over the same event stream (parallel to recording) |
+
+Vendor mapping stays in `packages/harnesssec/src/adapters/`. Core stays harness-neutral.
+
+---
+
+## Detections
+
+Stateful detectors over normalized events (Phase 3). Details: [`docs/behavioral-detections.md`](docs/behavioral-detections.md).
+
+| Detection | Severity | What it requires |
+|---|---|---|
+| **Alternate capability circumvention** | high | Same agent: blocked sensitive action → equivalent target via a *different* capability family within 30s |
+| **Delegated policy circumvention** | critical | Ancestor block + **observed** `subagent.spawned` + child equivalent action within timing windows |
+| **Delegation privilege expansion** | medium | Observed parent/child lineage **and** capability snapshots on both agents |
+
+Equivalence uses deterministic `exact` / `strong` normalization only. Ambiguous shell (`unknown`) never matches for circumvention.
+
+**Honest limits**
+
+- Detector logic is portable across harness *names*.
+- **Live OpenHands lineage telemetry is PARTIAL** — the adapter does not emit `subagent.*` today. Delegated circumvention needs observed spawn; `parent_agent_id` alone is not enough.
+
+---
+
+## Harness support
+
+| Harness | Adapter | Pre-exec BLOCK (live) | Behavioral detectors | Live lineage |
+|---|---|---|---|---|
+| **DeepSeek DSH** | Cordis plugin | Proven (ALLOW + BLOCK side-effect tests) | Portable | Subagent seams available |
+| **OpenHands** | Hook adapter | Proven (ALLOW + BLOCK side-effect tests) | Portable | **PARTIAL** — no live `subagent.*` emission |
+
+Documented bypasses (adapter-specific): DeepSeek `ctx.shell` · OpenHands `execute_tool`. See [`docs/blind-spots.md`](docs/blind-spots.md) and [`docs/openhands-blind-spots.md`](docs/openhands-blind-spots.md).
+
+---
+
+## Quick start
+
+Requires **Node 20+**.
 
 ```sh
 git clone https://github.com/inaor/Harn.x.git
 cd Harn.x/packages/harnesssec
 npm install
-```
-
-### 2. Run the attack demo
-
-```sh
 npm run demo
 ```
 
-You should see a summary like:
-
-```text
-HarnessSec Phase 1 demo
-──────────────────────
-Objective: Analyze this repository.
-Context: README.md [UNTRUSTED]
-Influenced: agent-001
-Agent requested: bash / cat ~/.ssh/id_rsa
-Decision: BLOCKED
-Rule: credential-path-in-shell-args
-Agent reaction recorded: yes (alternate tool)
-
-Thesis hold: blocked from harness intent+context before OS execution.
-```
-
-Then a forensic replay of session `attack-demo` (context → tool → BLOCK → aftermath).
-
-### 3. List recorded sessions
+Useful commands:
 
 ```sh
 npm run cli -- sessions
-```
-
-```text
-attack-demo  started=…  events=…  objective=Analyze this repository.
-```
-
-### 4. Replay the session
-
-```sh
 npm run cli -- replay attack-demo
-```
-
-Look for:
-
-```text
-Context introduced
-source: README.md
-trust: UNTRUSTED
-        ↓
-Tool request
-tool: bash
-command: cat ~/.ssh/id_rsa
-        ↓
-HarnessSec Policy
-decision: BLOCK
-        ↓
-BLOCKED BEFORE EXECUTION
-        ↓
-Agent reaction after block
-selected alternate tool: read
-```
-
-### 5. Causal graph
-
-```sh
-npm run cli -- graph attack-demo
-```
-
-Shows event IDs plus links such as `context_source=…` and `policy_decision_for=…`.
-
-### 6. Detections only
-
-```sh
+npm run cli -- incident attack-demo
 npm run cli -- detections attack-demo
-```
-
-```text
-…  BLOCK  credential-path-in-shell-args  Shell tool arguments reference credential material: cat ~/.ssh/id_rsa
-```
-
-### 7. Agent lineage + policies
-
-```sh
-npm run cli -- agents attack-demo
-npm run cli -- policies
-```
-
-### Optional: custom store directory
-
-```sh
-npm run cli -- --store /tmp/harnx-demo demo
-npm run cli -- --store /tmp/harnx-demo replay attack-demo
+npm run cli -- graph attack-demo
 ```
 
 ### Tests
 
 ```sh
-npm test
+npm test                 # unit (includes Phase 3 behavior)
+npm run test:integration # live DSH + OpenHands ALLOW/BLOCK proofs (needs OpenHands SDK + uv for OH)
 ```
 
----
-
-## CLI reference
-
-```text
-harnesssec demo
-harnesssec sessions
-harnesssec inspect <session>
-harnesssec replay <session>
-harnesssec graph <session>
-harnesssec agents [session]
-harnesssec policies
-harnesssec detections [session]
-harnesssec attach dsh
-```
-
-Via npm scripts from `packages/harnesssec`:
-
-```sh
-npm run demo
-npm run cli -- <command>
-```
-
----
-
-## Attach to DeepSeek Harness (live)
-
-Phase 1 ships a Cordis plugin adapter on verified seams (`tools/pre-execute` deny, `tools/result`, `session/event`, `agent/created`, `subagent/start`).
+### Attach DeepSeek Harness (live)
 
 ```sh
 dsh plugin --profile web add /path/to/Harn.x/packages/harnesssec
-```
-
-```sh
 npm run cli -- attach dsh
 ```
 
-Live attach is the next integration step; the demo above proves the recorder, graph, and enforcement logic without booting full `dsh`.
+---
+
+## Security model
+
+Harn.x is built around harness-native primitives — not generic process/file/socket telemetry as the primary feature.
+
+**Invariants (summary)**
+
+1. Never persist raw secrets; redact on persist.
+2. Policy may see raw in-memory events before redaction.
+3. No unsupported causality (`caused_by` only when justified).
+4. Vendor types stay out of core.
+5. BLOCK claims need side-effect-absent proof + ALLOW control.
+6. Every adapter documents bypasses.
+7. Never claim full coverage without proof.
+8. Sensor failure must not silently fail-open paths Harn.x controls.
+
+Full contract: [`docs/architecture-contract.md`](docs/architecture-contract.md) · Guardian: [`.github/workflows/guardian.yml`](.github/workflows/guardian.yml).
+
+### What Harn.x is not
+
+- Not an EDR / eBPF / CNAPP replacement  
+- Not a complete SOAR or SOC  
+- Not a universal AI security platform  
+- Not production-ready  
+- Not protection for every AI agent  
+- Not a complete OpenHands lineage monitor  
+- Not an AI firewall  
 
 ---
 
 ## Status
 
-| Phase | Status |
+| Phase | Verdict |
 |---|---|
-| 0 — DeepSeek choke-point map | Complete — [`docs/deepseek-harness-architecture.md`](docs/deepseek-harness-architecture.md) |
-| 1 — Harness flight recorder + **live DSH validation** | **COMPLETE** — [`docs/phase1-live-validation.md`](docs/phase1-live-validation.md) |
-| 2 — OpenHands portability | **PASS** — [`docs/phase2-final-validation.md`](docs/phase2-final-validation.md) |
-| 2.1 — Provenance + Guardian | **COMPLETE** — UserPromptSubmit live proof + independent Guardian |
-| 3 — Stateful behavioral detection | **PASS** (OH live lineage PARTIAL) — [`docs/phase3-findings.md`](docs/phase3-findings.md) |
+| 0 — DeepSeek choke-point map | Complete |
+| 1 — Flight recorder + live DSH policy | **PASS** |
+| 2 — OpenHands portability | **PASS** |
+| 2.1 — Provenance + Guardian | Complete |
+| 3 — Stateful behavioral detection | **PASS** (OH live lineage **PARTIAL**) |
+| 3.5+ | Paused |
 
-Blind spots: [`docs/blind-spots.md`](docs/blind-spots.md) · OpenHands: [`docs/openhands-blind-spots.md`](docs/openhands-blind-spots.md)
+Engineering phases are paused. This README reflects verified capabilities through Phase 3.
 
-### Live proof (integration)
-
-```sh
-cd packages/harnesssec
-npm ci
-npm run build
-npm test
-npm run test:integration
-```
-
-Expected:
-
-- DeepSeek: BLOCK leaves `/tmp/harnx-proof` absent; ALLOW creates `/tmp/harnx-allow-ok`
-- OpenHands: BLOCK leaves `/tmp/harnx-openhands-proof` absent; ALLOW creates `/tmp/harnx-openhands-allowed`
-- Documented bypasses: DeepSeek `ctx.shell` · OpenHands `execute_tool`
-
-OpenHands live tests need a local `openhands-sdk/` checkout (CI clones it) and `uv`.
+---
 
 ## Docs
 
-- [`docs/phase1-capabilities.md`](docs/phase1-capabilities.md)
-- [`docs/security-primitives.md`](docs/security-primitives.md)
-- [`docs/event-schema.md`](docs/event-schema.md)
-- [`docs/causal-graph.md`](docs/causal-graph.md)
-- [`docs/phase1-live-validation.md`](docs/phase1-live-validation.md)
-- [`docs/blind-spots.md`](docs/blind-spots.md)
-- [`docs/phase1-findings.md`](docs/phase1-findings.md)
-- [`docs/openhands-architecture.md`](docs/openhands-architecture.md)
-- [`docs/openhands-blind-spots.md`](docs/openhands-blind-spots.md)
-- [`docs/harness-comparison.md`](docs/harness-comparison.md)
-- [`docs/phase2-findings.md`](docs/phase2-findings.md)
-- [`docs/phase2-final-validation.md`](docs/phase2-final-validation.md)
-- [`docs/behavioral-model.md`](docs/behavioral-model.md)
-- [`docs/behavioral-detections.md`](docs/behavioral-detections.md)
-- [`docs/phase3-findings.md`](docs/phase3-findings.md)
-- [`docs/architecture-contract.md`](docs/architecture-contract.md)
+| Topic | Doc |
+|---|---|
+| Architecture contract | [`docs/architecture-contract.md`](docs/architecture-contract.md) |
+| Behavioral model | [`docs/behavioral-model.md`](docs/behavioral-model.md) |
+| Behavioral detections | [`docs/behavioral-detections.md`](docs/behavioral-detections.md) |
+| Phase 3 findings | [`docs/phase3-findings.md`](docs/phase3-findings.md) |
+| Event schema | [`docs/event-schema.md`](docs/event-schema.md) |
+| Security primitives | [`docs/security-primitives.md`](docs/security-primitives.md) |
+| Phase 1 live validation | [`docs/phase1-live-validation.md`](docs/phase1-live-validation.md) |
+| Phase 2 final validation | [`docs/phase2-final-validation.md`](docs/phase2-final-validation.md) |
+| DeepSeek architecture | [`docs/deepseek-harness-architecture.md`](docs/deepseek-harness-architecture.md) |
+| OpenHands architecture | [`docs/openhands-architecture.md`](docs/openhands-architecture.md) |
+| Blind spots | [`docs/blind-spots.md`](docs/blind-spots.md) · [`docs/openhands-blind-spots.md`](docs/openhands-blind-spots.md) |
+
+---
+
+**Harn.x** — experimental open behavioral security for autonomous agent harnesses.

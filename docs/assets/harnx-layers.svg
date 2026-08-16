@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 280" role="img" aria-label="Harn.x layers from adapters to response">
+  <defs>
+    <linearGradient id="bg3" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#0a0b10"/>
+      <stop offset="100%" stop-color="#14101f"/>
+    </linearGradient>
+  </defs>
+  <rect width="960" height="280" rx="20" fill="url(#bg3)"/>
+  <text x="480" y="36" text-anchor="middle" fill="#e2e8f0" font-family="ui-sans-serif, system-ui, sans-serif" font-size="15" font-weight="700">How Harn.x layers</text>
+
+  <g font-family="ui-sans-serif, system-ui, sans-serif" font-size="12" font-weight="700">
+    <rect x="36" y="70" width="160" height="72" rx="14" fill="#12161f" stroke="#22d3ee"/>
+    <text x="116" y="100" text-anchor="middle" fill="#67e8f9">ADAPTERS</text>
+    <text x="116" y="120" text-anchor="middle" fill="#94a3b8" font-weight="500" font-size="11">DSH · OpenHands</text>
+
+    <path d="M196 106 L224 106" stroke="#64748b" stroke-width="2"/>
+    <polygon points="230,106 222,101 222,111" fill="#94a3b8"/>
+
+    <rect x="236" y="70" width="160" height="72" rx="14" fill="#12161f" stroke="#a78bfa"/>
+    <text x="316" y="100" text-anchor="middle" fill="#c4b5fd">EVENTS</text>
+    <text x="316" y="120" text-anchor="middle" fill="#94a3b8" font-weight="500" font-size="11">normalized model</text>
+
+    <path d="M396 106 L424 106" stroke="#64748b" stroke-width="2"/>
+    <polygon points="430,106 422,101 422,111" fill="#94a3b8"/>
+
+    <rect x="436" y="70" width="160" height="72" rx="14" fill="#12161f" stroke="#22d3ee"/>
+    <text x="516" y="100" text-anchor="middle" fill="#67e8f9">GRAPH</text>
+    <text x="516" y="120" text-anchor="middle" fill="#94a3b8" font-weight="500" font-size="11">lineage · capability</text>
+
+    <path d="M596 106 L624 106" stroke="#64748b" stroke-width="2"/>
+    <polygon points="630,106 622,101 622,111" fill="#94a3b8"/>
+
+    <rect x="636" y="70" width="140" height="72" rx="14" fill="#12161f" stroke="#ec4899"/>
+    <text x="706" y="100" text-anchor="middle" fill="#f9a8d4">POLICY</text>
+    <text x="706" y="120" text-anchor="middle" fill="#94a3b8" font-weight="500" font-size="11">pre-exec</text>
+
+    <path d="M776 106 L804 106" stroke="#64748b" stroke-width="2"/>
+    <polygon points="810,106 802,101 802,111" fill="#94a3b8"/>
+
+    <rect x="816" y="70" width="108" height="72" rx="14" fill="#12161f" stroke="#a78bfa"/>
+    <text x="870" y="100" text-anchor="middle" fill="#c4b5fd">DETECT</text>
+    <text x="870" y="120" text-anchor="middle" fill="#94a3b8" font-weight="500" font-size="11">stateful</text>
+  </g>
+
+  <text x="480" y="190" text-anchor="middle" fill="#cbd5e1" font-family="ui-sans-serif, system-ui, sans-serif" font-size="13" font-weight="600">Vendor mapping stays in adapters. Core stays harness-neutral.</text>
+  <text x="480" y="220" text-anchor="middle" fill="#64748b" font-family="ui-sans-serif, system-ui, sans-serif" font-size="12">Policy may BLOCK before side effects. Behavior detects multi-event patterns after blocks.</text>
+  <text x="480" y="250" text-anchor="middle" fill="#475569" font-family="ui-sans-serif, system-ui, sans-serif" font-size="11">Experimental  not a complete security platform.</text>
+</svg>

@@ -1,0 +1,62 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 480" role="img" aria-label="Traditional runtime view versus Harn.x behavioral view">
+  <defs>
+    <linearGradient id="bg2" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0a0b10"/>
+      <stop offset="100%" stop-color="#15101f"/>
+    </linearGradient>
+    <linearGradient id="panel" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#161a24"/>
+      <stop offset="100%" stop-color="#10141c"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="960" height="480" rx="24" fill="url(#bg2)"/>
+  <text x="480" y="42" text-anchor="middle" fill="#e2e8f0" font-family="ui-sans-serif, system-ui, sans-serif" font-size="18" font-weight="700">Same execution environment. Different security context.</text>
+  <text x="480" y="66" text-anchor="middle" fill="#94a3b8" font-family="ui-sans-serif, system-ui, sans-serif" font-size="12">Endpoint/runtime telemetry vs harness-native behavioral semantics</text>
+
+  <!-- Left panel -->
+  <rect x="40" y="92" width="400" height="350" rx="18" fill="url(#panel)" stroke="#334155" stroke-width="1.5"/>
+  <text x="240" y="128" text-anchor="middle" fill="#94a3b8" font-family="ui-sans-serif, system-ui, sans-serif" font-size="14" font-weight="700" letter-spacing="0.5">TRADITIONAL RUNTIME VIEW</text>
+
+  <g font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="13" fill="#cbd5e1">
+    <circle cx="100" cy="180" r="6" fill="#64748b"/>
+    <text x="120" y="185">process A</text>
+    <line x1="100" y1="186" x2="100" y2="218" stroke="#475569" stroke-width="2"/>
+    <circle cx="100" cy="228" r="6" fill="#64748b"/>
+    <text x="120" y="233">file read</text>
+    <line x1="100" y1="234" x2="100" y2="266" stroke="#475569" stroke-width="2"/>
+    <circle cx="100" cy="276" r="6" fill="#64748b"/>
+    <text x="120" y="281">process B</text>
+    <line x1="100" y1="282" x2="100" y2="314" stroke="#475569" stroke-width="2"/>
+    <circle cx="100" cy="324" r="6" fill="#64748b"/>
+    <text x="120" y="329">network connection</text>
+  </g>
+  <text x="240" y="390" text-anchor="middle" fill="#64748b" font-family="ui-sans-serif, system-ui, sans-serif" font-size="12">What executed  after the fact</text>
+
+  <!-- Right panel -->
+  <rect x="520" y="92" width="400" height="350" rx="18" fill="url(#panel)" stroke="#22d3ee" stroke-width="1.75"/>
+  <text x="720" y="128" text-anchor="middle" fill="#67e8f9" font-family="ui-sans-serif, system-ui, sans-serif" font-size="14" font-weight="700" letter-spacing="0.5">HARN.X BEHAVIORAL VIEW</text>
+
+  <g font-family="ui-sans-serif, system-ui, sans-serif" font-size="12.5" font-weight="600">
+    <rect x="580" y="150" width="280" height="28" rx="8" fill="#0f172a" stroke="#a78bfa"/>
+    <text x="720" y="168" text-anchor="middle" fill="#e9d5ff">Untrusted Context</text>
+    <line x1="720" y1="178" x2="720" y2="192" stroke="#64748b" stroke-width="2"/>
+    <rect x="580" y="192" width="280" height="28" rx="8" fill="#0f172a" stroke="#22d3ee"/>
+    <text x="720" y="210" text-anchor="middle" fill="#cffafe">Sensitive Action</text>
+    <line x1="720" y1="220" x2="720" y2="234" stroke="#64748b" stroke-width="2"/>
+    <rect x="580" y="234" width="280" height="28" rx="8" fill="#3b1220" stroke="#ec4899"/>
+    <text x="720" y="252" text-anchor="middle" fill="#f9a8d4">BLOCKED</text>
+    <line x1="720" y1="262" x2="720" y2="276" stroke="#64748b" stroke-width="2"/>
+    <rect x="580" y="276" width="280" height="28" rx="8" fill="#0f172a" stroke="#22d3ee"/>
+    <text x="720" y="294" text-anchor="middle" fill="#cffafe">Alternate Capability</text>
+    <line x1="720" y1="304" x2="720" y2="318" stroke="#64748b" stroke-width="2"/>
+    <rect x="580" y="318" width="280" height="28" rx="8" fill="#0f172a" stroke="#a78bfa"/>
+    <text x="720" y="336" text-anchor="middle" fill="#e9d5ff">Delegation</text>
+    <line x1="720" y1="346" x2="720" y2="360" stroke="#64748b" stroke-width="2"/>
+    <rect x="580" y="360" width="280" height="28" rx="8" fill="#0f172a" stroke="#22d3ee"/>
+    <text x="720" y="378" text-anchor="middle" fill="#cffafe">Child Equivalent Action</text>
+    <line x1="720" y1="388" x2="720" y2="400" stroke="#ec4899" stroke-width="2"/>
+    <rect x="560" y="400" width="320" height="28" rx="8" fill="#2a0a18" stroke="#ec4899"/>
+    <text x="720" y="418" text-anchor="middle" fill="#fda4af">BEHAVIORAL DETECTION</text>
+  </g>
+</svg>
