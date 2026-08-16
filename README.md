@@ -212,4 +212,6 @@ Expected: BLOCK leaves `/tmp/harnx-proof` absent; ALLOW creates `/tmp/harnx-allo
 - [`docs/security-primitives.md`](docs/security-primitives.md)
 - [`docs/event-schema.md`](docs/event-schema.md)
 - [`docs/causal-graph.md`](docs/causal-graph.md)
+- [`docs/phase1-live-validation.md`](docs/phase1-live-validation.md)
+- [`docs/blind-spots.md`](docs/blind-spots.md)
 - [`docs/phase1-findings.md`](docs/phase1-findings.md)
