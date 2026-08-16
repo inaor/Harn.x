@@ -1,6 +1,9 @@
 import type { HarnessEvent } from '../events/schema.js'
 
-/** CAPABILITY AVAILABLE vs CAPABILITY USED */
+/**
+ * CAPABILITY AVAILABLE vs CAPABILITY USED.
+ * Available is only from capability.snapshot — never inferred from tool use.
+ */
 export class CapabilityTracker {
   private available = new Map<string, Set<string>>()
   private used = new Map<string, Set<string>>()
@@ -22,18 +25,16 @@ export class CapabilityTracker {
       const set = this.used.get(agentId) ?? new Set()
       set.add(event.tool.name)
       this.used.set(agentId, set)
-
-      // First sighting also expands available if no snapshot yet
-      const avail = this.available.get(agentId) ?? new Set()
-      avail.add(event.tool.name)
-      this.available.set(agentId, avail)
+      // Do NOT add to available — use ≠ availability.
     }
   }
 
+  /** Snapshot-declared available capabilities only. */
   availableFor(agentId: string): string[] {
     return [...(this.available.get(agentId) ?? [])].sort()
   }
 
+  /** Observed capability use (tool requests). */
   usedBy(agentId: string): string[] {
     return [...(this.used.get(agentId) ?? [])].sort()
   }
@@ -43,10 +44,10 @@ export class CapabilityTracker {
     const u = this.usedBy(agentId)
     return [
       `Agent ${agentId}`,
-      '  AVAILABLE:',
-      ...a.map(x => `    - ${x}`),
-      '  USED:',
-      ...u.map(x => `    - ${x}`),
+      '  AVAILABLE (snapshot):',
+      ...(a.length ? a.map(x => `    - ${x}`) : ['    (none observed)']),
+      '  USED (observed):',
+      ...(u.length ? u.map(x => `    - ${x}`) : ['    (none)']),
     ].join('\n')
   }
 }

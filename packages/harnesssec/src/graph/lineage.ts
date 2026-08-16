@@ -3,11 +3,15 @@ import type { HarnessEvent } from '../events/schema.js'
 export interface AgentNode {
   agent_id: string
   parent_agent_id?: string | null
+  /** OBSERVED from links.delegated_by when present. */
+  delegated_by?: string
   session_id: string
   created_at: string
   ended_at?: string
   objective?: string
   tools_seen: Set<string>
+  /** OBSERVED capability.snapshot at spawn/start — never fabricated. */
+  capabilities_at_spawn?: string[]
 }
 
 export class AgentLineage {
@@ -29,6 +33,13 @@ export class AgentLineage {
     }
     if (event.event_type === 'subagent.spawned' && event.agent.parent_agent_id) {
       node.parent_agent_id = event.agent.parent_agent_id
+      if (event.links?.delegated_by) node.delegated_by = event.links.delegated_by
+      if (event.capability?.available) {
+        node.capabilities_at_spawn = [...event.capability.available]
+      }
+    }
+    if (event.event_type === 'capability.snapshot' && event.capability?.available && !node.capabilities_at_spawn) {
+      node.capabilities_at_spawn = [...event.capability.available]
     }
     if (event.event_type === 'agent.ended' || event.event_type === 'subagent.ended') {
       node.ended_at = event.timestamp

@@ -96,6 +96,22 @@ export function renderReplay(recorder: FlightRecorder, sessionId: string): strin
       lines.push('        ↓')
       lines.push('')
     }
+
+    if (e.event_type === 'behavior.detection' && e.detection) {
+      lines.push('BEHAVIORAL DETECTION')
+      lines.push('')
+      lines.push(`kind:`)
+      lines.push(e.detection.kind)
+      lines.push('')
+      lines.push(`severity:`)
+      lines.push(e.detection.severity.toUpperCase())
+      lines.push('')
+      lines.push(`title:`)
+      lines.push(e.detection.title)
+      lines.push('')
+      lines.push('        ↓')
+      lines.push('')
+    }
   }
 
   lines.push('Session status:')
@@ -123,6 +139,7 @@ function label(t: string): string {
     case 'tool.denied': return 'Tool denied'
     case 'tool.completed': return 'Tool completed'
     case 'policy.aftermath': return 'Post-block behavior'
+    case 'behavior.detection': return 'Behavioral detection'
     case 'agent.started': return 'Agent started'
     case 'session.started': return 'Session started'
     case 'subagent.spawned': return 'Sub-agent spawned'

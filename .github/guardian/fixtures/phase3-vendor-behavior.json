@@ -1,0 +1,12 @@
+{
+  "title": "Vendor branch in behavior detection",
+  "body": "Fixture for Guardian Phase 3 self-test",
+  "files": [
+    {
+      "filename": "packages/harnesssec/src/behavior/detections.ts",
+      "status": "modified",
+      "patch": "@@ -1,3 +1,6 @@\n+if (harness.name === 'openhands') {\n+  return specialOhDetection()\n+}\n export function findAlternateCapabilityCircumvention() {}\n"
+    }
+  ],
+  "expected_verdicts": ["REQUEST_CHANGES", "BLOCK"]
+}

@@ -34,6 +34,7 @@ export type EventType =
   | 'subagent.ended'
   | 'policy.decision'
   | 'policy.aftermath'
+  | 'behavior.detection'
   | 'approval.asked'
   | 'approval.decided'
 
@@ -55,6 +56,12 @@ export interface EventLinks {
   tool_source?: string
   result_of?: string
   policy_decision_for?: string
+  /** CORRELATED: tool request after a prior block (not causal intent). */
+  attempted_after?: string
+  /** DERIVED: same normalized category+target as another action/block. */
+  equivalent_to?: string
+  /** OBSERVED: policy decision that blocked this tool request. */
+  blocked_by?: string
 }
 
 export interface HarnessEvent {
@@ -118,6 +125,25 @@ export interface HarnessEvent {
     rule?: string
     severity?: 'low' | 'medium' | 'high' | 'critical'
     reason?: string
+  }
+  /** Stateful behavioral detection (Phase 3) — not per-request policy. */
+  detection?: {
+    id: string
+    kind:
+      | 'agent.policy_circumvention'
+      | 'agent.delegated_policy_circumvention'
+      | 'agent.delegation_privilege_expansion'
+    severity: 'low' | 'medium' | 'high' | 'critical'
+    title: string
+    evidence: {
+      blocked_event_id: string
+      action_event_id: string
+      category: string
+      target: string
+      window_ms: number
+      parent_agent_id?: string
+      child_agent_id?: string
+    }
   }
   links?: EventLinks
   raw?: {

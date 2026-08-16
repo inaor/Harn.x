@@ -4,6 +4,7 @@ import { join } from 'node:path'
 import { homedir } from 'node:os'
 import { createRuntime } from '../adapters/deepseek/index.js'
 import { runAttackDemo } from '../demo/attack-demo.js'
+import { renderIncident } from '../behavior/render.js'
 import { renderReplay } from './replay.js'
 
 function storeDir(flag?: string): string {
@@ -187,16 +188,33 @@ async function main(): Promise<void> {
     const sessions = id ? [recorder.getSession(id)].filter(Boolean) : recorder.listSessions()
     for (const s of sessions) {
       if (!s) continue
-      const dets = s.events.filter((e: { event_type: string; policy?: { decision?: string } }) =>
+      const policyDets = s.events.filter((e: { event_type: string; policy?: { decision?: string } }) =>
         e.event_type === 'policy.decision' && e.policy?.decision !== 'allow',
       )
+      const behaviorDets = s.events.filter((e: { event_type: string }) => e.event_type === 'behavior.detection')
       console.log(`# ${s.session_id}`)
-      for (const d of dets) {
+      console.log('## policy')
+      for (const d of policyDets) {
         console.log(`${d.timestamp}  ${d.policy?.decision?.toUpperCase()}  ${d.policy?.rule}  ${d.policy?.reason}`)
       }
-      if (!dets.length) console.log('(none)')
+      if (!policyDets.length) console.log('(none)')
+      console.log('## behavior')
+      for (const d of behaviorDets) {
+        console.log(`${d.timestamp}  ${d.detection?.severity?.toUpperCase()}  ${d.detection?.kind}  ${d.detection?.title}`)
+      }
+      if (!behaviorDets.length) console.log('(none)')
       console.log('')
     }
+    return
+  }
+
+  if (cmd === 'incident') {
+    const id = rest[0]
+    if (!id) {
+      console.error('usage: harnesssec incident <session-id>')
+      process.exit(1)
+    }
+    console.log(renderIncident(recorder, id))
     return
   }
 
@@ -219,7 +237,8 @@ Commands:
   graph <session>         Print causal event graph
   agents [session]        Show agent lineage
   policies                List active rules
-  detections [session]    List non-allow policy decisions
+  detections [session]    List non-allow policy decisions and behavioral detections
+  incident <session>      Render HARN.X INCIDENT behavioral timeline
 
 Options:
   --store <dir>           Session store directory (default: ~/.harnesssec/sessions)

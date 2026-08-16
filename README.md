@@ -193,6 +193,7 @@ Live attach is the next integration step; the demo above proves the recorder, gr
 | 1 — Harness flight recorder + **live DSH validation** | **COMPLETE** — [`docs/phase1-live-validation.md`](docs/phase1-live-validation.md) |
 | 2 — OpenHands portability | **PASS** — [`docs/phase2-final-validation.md`](docs/phase2-final-validation.md) |
 | 2.1 — Provenance + Guardian | **COMPLETE** — UserPromptSubmit live proof + independent Guardian |
+| 3 — Stateful behavioral detection | **PASS** (OH live lineage PARTIAL) — [`docs/phase3-findings.md`](docs/phase3-findings.md) |
 
 Blind spots: [`docs/blind-spots.md`](docs/blind-spots.md) · OpenHands: [`docs/openhands-blind-spots.md`](docs/openhands-blind-spots.md)
 
@@ -228,4 +229,7 @@ OpenHands live tests need a local `openhands-sdk/` checkout (CI clones it) and `
 - [`docs/harness-comparison.md`](docs/harness-comparison.md)
 - [`docs/phase2-findings.md`](docs/phase2-findings.md)
 - [`docs/phase2-final-validation.md`](docs/phase2-final-validation.md)
+- [`docs/behavioral-model.md`](docs/behavioral-model.md)
+- [`docs/behavioral-detections.md`](docs/behavioral-detections.md)
+- [`docs/phase3-findings.md`](docs/phase3-findings.md)
 - [`docs/architecture-contract.md`](docs/architecture-contract.md)

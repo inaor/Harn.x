@@ -10,7 +10,7 @@
  * verdict: PASS | REQUEST_CHANGES | BLOCK
  */
 
-import { readFileSync, existsSync } from 'node:fs'
+import { readFileSync, existsSync, readdirSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -66,6 +66,7 @@ function isCorePath(name) {
     || name.startsWith('packages/harnesssec/src/policy/')
     || name.startsWith('packages/harnesssec/src/events/')
     || name.startsWith('packages/harnesssec/src/graph/')
+    || name.startsWith('packages/harnesssec/src/behavior/')
   )
 }
 
@@ -81,6 +82,88 @@ function isTestPath(name) {
     || name.endsWith('.test.ts')
     || name.endsWith('.test.js')
   )
+}
+
+/**
+ * Phase 3 Guardian checks for behavioral detection quality.
+ * @param {PrFile[]} files
+ * @param {string} root
+ * @param {Finding[]} findings
+ * @param {string} allAdded
+ * @param {string[]} names
+ */
+export function checkPhase3Behavior(files, root, findings, allAdded, names) {
+  const behaviorFiles = files.filter((f) => f.filename.replace(/\\/g, '/').includes('/behavior/'))
+  for (const f of behaviorFiles) {
+    const body = addedLines(f.patch)
+    if (/if\s*\(\s*(?:event\.)?harness(?:\.name)?\s*===|harness\s*===\s*['"]openhands['"]|harness\s*===\s*['"]deepseek/i.test(body)) {
+      findings.push({
+        severity: 'BLOCKER',
+        file: f.filename,
+        message: 'Vendor-specific branch in behavioral detection — keep adapters vendor-specific only',
+      })
+    }
+    if (/\bcaused_by\s*:/.test(body)) {
+      findings.push({
+        severity: 'BLOCKER',
+        file: f.filename,
+        message: 'behavior module must not emit caused_by — use correlated_with / attempted_after / equivalent_to',
+      })
+    }
+  }
+
+  // Workspace scan of behavior/ for vendor branches (default-branch drift)
+  const behaviorDir = join(root, 'packages/harnesssec/src/behavior')
+  if (existsSync(behaviorDir)) {
+    for (const name of readdirSync(behaviorDir)) {
+      if (!name.endsWith('.ts') && !name.endsWith('.js')) continue
+      const text = readFileSync(join(behaviorDir, name), 'utf8')
+      if (/if\s*\(\s*harness|harness\.name\s*===/.test(text)) {
+        findings.push({
+          severity: 'BLOCKER',
+          file: `packages/harnesssec/src/behavior/${name}`,
+          message: 'Vendor-specific behavior detection in workspace behavior/',
+        })
+      }
+    }
+  }
+
+  const detectionTouched = names.some((n) =>
+    /behavior\/(detections|engine|sequence)\.(ts|js)$/.test(n.replace(/\\/g, '/')),
+  )
+  const testsTouched = names.some((n) => n.includes('/tests/') || n.endsWith('.test.ts'))
+  const fpMention = /false positive|FP:|no circumvention|negative test/i.test(allAdded)
+    || names.some((n) => n.includes('phase3-behavior.test'))
+  if (detectionTouched && !testsTouched && !fpMention) {
+    const hasPhase3Tests = existsSync(join(root, 'packages/harnesssec/tests/phase3-behavior.test.ts'))
+    if (!hasPhase3Tests) {
+      findings.push({
+        severity: 'HIGH',
+        file: 'packages/harnesssec/src/behavior',
+        message: 'Behavioral detection changed without false-positive / negative tests',
+      })
+    }
+  }
+
+  if (/OpenHands.*delegated.*live|live OpenHands.*delegat/i.test(allAdded)
+    && /PASS|COMPLETE|full coverage/i.test(allAdded)
+    && !/PARTIAL|insufficient|no subagent/i.test(allAdded)) {
+    findings.push({
+      severity: 'HIGH',
+      file: 'docs',
+      message: 'Docs claim live OpenHands delegated circumvention coverage without PARTIAL/insufficient telemetry caveat',
+    })
+  }
+
+  if (/EDR|eBPF|process tree|network flow/i.test(allAdded)
+    && /behavior\.detection|policy_circumvention/i.test(allAdded)
+    && names.some((n) => n.includes('src/behavior/'))) {
+    findings.push({
+      severity: 'HIGH',
+      file: 'src/behavior',
+      message: 'Behavioral detection appears to duplicate generic EDR/OS signatures rather than harness semantics',
+    })
+  }
 }
 
 /**
@@ -263,17 +346,28 @@ export function review(files, contractText, opts = {}) {
     }
   }
 
-  // Premature Phase 3
-  const phase3Markers = /detection language|sequence:\s*\n|Delegated Policy Circumvention|behavioral state machine/i
-  if (phase3Markers.test(allAdded) && names.some((n) => n.includes('src/') && !n.includes('docs/'))) {
-    if (!/Phase 2\.1|phase2-final|OpenHands portability/i.test(allAdded)) {
+  // Premature YAML DSL / Harness #3 (Phase 3 behavioral code is allowed)
+  if (/detection\s+language|behavioral\s+YAML|rule:\s*\n\s+sequence:/i.test(allAdded)
+    && names.some((n) => n.includes('src/') && !n.includes('docs/'))) {
+    findings.push({
+      severity: 'BLOCKER',
+      file: 'diff',
+      message: 'YAML/DSL detection language is out of scope — use programmatic behavior/ API only',
+    })
+  }
+  if (/adapters\/(?!deepseek|openhands)[^/]+\//i.test(names.join('\n'))
+    || /Harness\s*#\s*3|third harness adapter/i.test(allAdded) && names.some((n) => /adapters\//.test(n))) {
+    if (!/docs\//.test(names.join(' '))) {
       findings.push({
         severity: 'BLOCKER',
-        file: 'diff',
-        message: 'Suspected Phase 3 behavioral detection work before Phase 2 gate',
+        file: 'adapters',
+        message: 'Harness #3 / new adapter before Phase 4 gate',
       })
     }
   }
+
+  // Phase 3 behavioral quality checks
+  checkPhase3Behavior(files, root, findings, allAdded, names)
 
   // Blind spot / bypass docs when adapter execution paths change
   const adapterExec = names.some((n) => /adapters\/.*\.(ts|js)$/.test(n) && !isTestPath(n))

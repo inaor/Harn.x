@@ -51,7 +51,7 @@ export class CausalGraph {
       if (!event) continue
       chain.push(event)
       const links = event.links ?? {}
-      for (const key of ['caused_by', 'parent_event', 'context_source', 'candidate_context_source', 'correlated_with', 'result_of', 'policy_decision_for', 'delegated_by'] as const) {
+      for (const key of ['caused_by', 'parent_event', 'context_source', 'candidate_context_source', 'correlated_with', 'result_of', 'policy_decision_for', 'delegated_by', 'attempted_after', 'equivalent_to', 'blocked_by'] as const) {
         const ref = links[key]
         if (ref) queue.push(ref)
       }
@@ -71,6 +71,7 @@ export class CausalGraph {
       if (e.action?.target) lines.push(`  target: ${e.action.target}`)
       if (e.context) lines.push(`  context: ${e.context.source_type} trust=${e.context.trust}`)
       if (e.policy) lines.push(`  policy: ${e.policy.decision} ${e.policy.rule ?? ''}`)
+      if (e.detection) lines.push(`  detection: ${e.detection.kind} ${e.detection.severity}`)
       if (linkBits) lines.push(`  links: ${linkBits}`)
       lines.push('')
     }

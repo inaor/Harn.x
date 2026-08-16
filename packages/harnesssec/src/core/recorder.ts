@@ -6,6 +6,7 @@ import { AgentLineage } from '../graph/lineage.js'
 import { CapabilityTracker } from '../graph/capabilities.js'
 import { TrustStore } from '../graph/trust.js'
 import { ContextProvenance } from '../graph/provenance.js'
+import { BehavioralEngine } from '../behavior/engine.js'
 import { McpTrustRegistry, DEFAULT_MCP_TRUST } from './mcp-trust.js'
 import { redactEvent } from './redact.js'
 
@@ -24,6 +25,7 @@ export class FlightRecorder {
   readonly trust = new TrustStore()
   readonly provenance = new ContextProvenance()
   readonly mcpTrust: McpTrustRegistry
+  readonly behavior: BehavioralEngine
 
   private sessions = new Map<string, SessionRecord>()
   private lastToolByAgent = new Map<string, string>()
@@ -34,6 +36,7 @@ export class FlightRecorder {
     this.storeDir = storeDir
     this.mcpTrust = mcpTrust ?? new McpTrustRegistry(DEFAULT_MCP_TRUST)
     mkdirSync(storeDir, { recursive: true })
+    this.behavior = new BehavioralEngine()
     this.loadExisting()
   }
 
@@ -45,6 +48,7 @@ export class FlightRecorder {
         const raw = JSON.parse(readFileSync(join(this.storeDir, name), 'utf8')) as SessionRecord
         this.sessions.set(raw.session_id, raw)
         for (const event of raw.events) this.indexEvent(event, false)
+        this.behavior.hydrateSession(raw.events)
       } catch {
         // skip corrupt
       }
@@ -88,7 +92,13 @@ export class FlightRecorder {
     this.enrichLinks(event)
     session.events.push(event)
     this.indexEvent(event, true)
+    // Parallel consumer: behavior does not depend on persistence.
+    const detections = this.behavior.observe(event)
     this.persist(event.session.id)
+    for (const det of detections) {
+      // record() will observe behavior.detection → engine returns [] (no recursion).
+      this.record(det)
+    }
     return event
   }
 

@@ -15,14 +15,19 @@ export { FlightRecorder } from './core/recorder.js'
 export { PolicyEngine } from './policy/engine.js'
 export { defaultRules } from './policy/rules.js'
 export { CausalGraph } from './graph/causal.js'
+export { BehavioralEngine, renderIncident, normalizeAction } from './behavior/index.js'
 export { createRuntime }
 
 /** Cordis plugin entry — `dsh plugin add` loads these from package root. */
 export { apply, name, inject, Config }
 export default { name, inject, apply, Config }
 
-export function createHarnessSec(storeDir: string): { recorder: FlightRecorder; policy: PolicyEngine } {
+export function createHarnessSec(storeDir: string): {
+  recorder: FlightRecorder
+  policy: PolicyEngine
+  behavior: import('./behavior/engine.js').BehavioralEngine
+} {
   const recorder = new FlightRecorder(storeDir)
   const policy = new PolicyEngine(recorder, defaultRules)
-  return { recorder, policy }
+  return { recorder, policy, behavior: recorder.behavior }
 }
