@@ -13,7 +13,13 @@ export type {
 } from './normalize.js'
 export { BlockedActionMemory, BlockedIntentMemory } from './memory.js'
 export type { BlockedAction, BlockedIntent } from './memory.js'
-export { matchBlockedThenEquivalent, DEFAULT_WINDOW_MS } from './sequence.js'
+export {
+  matchBlockedThenEquivalent,
+  matchDelegatedCircumvention,
+  DEFAULT_WINDOW_MS,
+  BLOCKED_ACTION_DELEGATION_TTL_MS,
+  DELEGATION_TO_CHILD_ACTION_MS,
+} from './sequence.js'
 export {
   findAlternateCapabilityCircumvention,
   findDelegatedPolicyCircumvention,

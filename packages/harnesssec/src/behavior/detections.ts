@@ -1,6 +1,12 @@
 import type { BlockedActionMemory } from './memory.js'
 import type { NormalizedAction } from './normalize.js'
-import { DEFAULT_WINDOW_MS, matchBlockedThenEquivalent } from './sequence.js'
+import {
+  BLOCKED_ACTION_DELEGATION_TTL_MS,
+  DEFAULT_WINDOW_MS,
+  DELEGATION_TO_CHILD_ACTION_MS,
+  matchBlockedThenEquivalent,
+  matchDelegatedCircumvention,
+} from './sequence.js'
 
 export type DetectionKind =
   | 'agent.policy_circumvention'
@@ -14,6 +20,8 @@ export interface DetectionHit {
   evidence: {
     blocked_event_id: string
     action_event_id: string
+    /** Prefer blocked tool request when correlating equivalence. */
+    blocked_tool_event_id?: string
     category: string
     target: string
     window_ms: number
@@ -47,6 +55,7 @@ export function findAlternateCapabilityCircumvention(opts: {
     title: 'Alternate capability policy circumvention',
     evidence: {
       blocked_event_id: match.blocked.event_id,
+      blocked_tool_event_id: match.blocked.tool_event_id,
       action_event_id: opts.actionEventId,
       category: opts.action.category,
       target: opts.action.target,
@@ -63,19 +72,23 @@ export function findDelegatedPolicyCircumvention(opts: {
   action: NormalizedAction
   actionTimestamp: string
   actionEventId: string
-  withinMs?: number
+  spawnTimestamp: string
+  blockTtlMs?: number
+  spawnToActionMs?: number
 }): DetectionHit | undefined {
   const parentId = opts.parentOf(opts.agentId)
   if (!parentId) return undefined
 
-  const windowMs = opts.withinMs ?? DEFAULT_WINDOW_MS
+  const blockTtl = opts.blockTtlMs ?? BLOCKED_ACTION_DELEGATION_TTL_MS
+  const spawnWindow = opts.spawnToActionMs ?? DELEGATION_TO_CHILD_ACTION_MS
   const ancestorBlocks = opts.memory.forAncestors(opts.sessionId, opts.agentId, opts.parentOf)
-  const match = matchBlockedThenEquivalent({
+  const match = matchDelegatedCircumvention({
     blocked: ancestorBlocks,
     action: opts.action,
     actionTimestamp: opts.actionTimestamp,
-    differentCapability: false,
-    withinMs: windowMs,
+    spawnTimestamp: opts.spawnTimestamp,
+    blockTtlMs: blockTtl,
+    spawnToActionMs: spawnWindow,
   })
   if (!match) return undefined
   return {
@@ -84,10 +97,11 @@ export function findDelegatedPolicyCircumvention(opts: {
     title: 'Delegated policy circumvention',
     evidence: {
       blocked_event_id: match.blocked.event_id,
+      blocked_tool_event_id: match.blocked.tool_event_id,
       action_event_id: opts.actionEventId,
       category: opts.action.category,
       target: opts.action.target,
-      window_ms: windowMs,
+      window_ms: spawnWindow,
       parent_agent_id: match.blocked.agent_id,
       child_agent_id: opts.agentId,
     },

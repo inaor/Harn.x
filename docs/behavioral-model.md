@@ -33,8 +33,8 @@ Original tool name + arguments are always preserved on `NormalizedAction.origina
 | Agent reaction | CORRELATED | Later tool request after block (not `caused_by`) |
 | Delegation | OBSERVED | `subagent.spawned` + explicit parent/child ids |
 | Child agent | OBSERVED | Child `agent.id` with `parent_agent_id` |
-| Capability available | OBSERVED | `capability.snapshot.available` only — never inferred from tool use |
-| Capability used | OBSERVED | `tool.requested` / `capability.used` |
+| Capability available | OBSERVED | Latest `capability.snapshot.available` only — **replaces** prior set; never inferred from tool use; scoped by `(session_id, agent_id)` |
+| Capability used | OBSERVED | `tool.requested` / `capability.used` history (accumulates); scoped by `(session_id, agent_id)` |
 | Capability change | DERIVED | Diff of successive **snapshots** |
 | Context trust | OBSERVED | `context.trust` |
 | Temporal relationship | OBSERVED | Event timestamps + configured window |
@@ -70,15 +70,12 @@ No LLM-based semantic classification in Phase 3.
 
 Distinguish:
 
-- **CAPABILITY AVAILABLE** — only from OBSERVED `capability.snapshot`
-- **CAPABILITY USED** — tool actually requested
+- **CAPABILITY AVAILABLE** — only from OBSERVED `capability.snapshot`; each snapshot **replaces** the prior available set
+- **CAPABILITY USED** — tool actually requested (history accumulates)
 
 Never infer availability solely because a tool was used.
 
-Signals (not automatic malice):
-
-- capability expansion between snapshots
-- child available set ⊃ parent available set (only when both snapshots OBSERVED)
+All agent behavioral / capability identity is keyed by `(session_id, agent_id)` so reused agent IDs cannot leak across sessions.
 
 ## Blocked action memory
 

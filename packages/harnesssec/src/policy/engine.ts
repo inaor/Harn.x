@@ -159,7 +159,7 @@ export class PolicyEngine {
       .filter((n): n is string => !!n)
 
     const availableTools = agentId
-      ? this.recorder.capabilities.availableFor(agentId)
+      ? this.recorder.capabilities.availableFor(event.session.id, agentId)
       : []
 
     return {

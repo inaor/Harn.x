@@ -16,11 +16,23 @@ OpenHands **delegated-circumvention is detector-portable** (same code path with 
 
 ## Configuration
 
-| Setting | Default | Notes |
-|---|---|---|
-| Match window | 30s | From blocked **tool request** time to subsequent attempt |
-| Equivalence | Deterministic `(category, target)` at `exact`/`strong` only | `unknown` never matches |
-| Lineage | Explicit `parent_agent_id` / `subagent.spawned` only | No timestamp inference |
+| Setting | Default | Constant | Notes |
+|---|---|---|---|
+| Same-agent alternate window | 30s | `DEFAULT_WINDOW_MS` | Block → alternate tool |
+| Blocked action delegation TTL | 5 min | `BLOCKED_ACTION_DELEGATION_TTL_MS` | How long a block remains eligible for delegated correlation |
+| Spawn → child action window | 30s | `DELEGATION_TO_CHILD_ACTION_MS` | Max delay from explicit spawn to equivalent child action |
+| Equivalence | exact/strong only | — | `unknown` never matches |
+| Lineage | Explicit parent/spawn only | — | Scoped by `(session_id, agent_id)` |
+
+### Delegated circumvention timing
+
+Requires **both**:
+
+1. Child action within `BLOCKED_ACTION_DELEGATION_TTL_MS` of the ancestor block
+2. Child action within `DELEGATION_TO_CHILD_ACTION_MS` of OBSERVED spawn/delegation timestamp
+
+Example: block at t0, spawn at t+120s, child equivalent at t+125s → **DETECT**.  
+Spawn at t+120s, child at t+200s → **NO DETECT** (spawn→action > 30s).
 
 ## Normalization levels
 
@@ -67,9 +79,9 @@ read: ~/.ssh/id_rsa         → DETECT agent.policy_circumvention (exact)
 
 ### Evidence bar
 
-1. Parent (ancestor) BLOCK with `(category, target)` exact/strong
-2. Child has **OBSERVED** `parent_agent_id`
-3. Child attempts equivalent `(category, target)` within window
+1. Parent (ancestor) BLOCK with `(category, target)` exact/strong still within delegation TTL (default 5 min)
+2. Child has **OBSERVED** `parent_agent_id` / spawn in the **same session**
+3. Child attempts equivalent `(category, target)` within spawn→action window (default 30s)
 
 ### Telemetry note
 
@@ -81,7 +93,12 @@ read: ~/.ssh/id_rsa         → DETECT agent.policy_circumvention (exact)
 **Kind:** `agent.delegation_privilege_expansion`  
 **Severity:** medium (signal)
 
-Requires OBSERVED `capability.snapshot` on **both** parent and child. Missing snapshots → no detection.
+Requires OBSERVED `capability.snapshot` on **both** parent and child (latest snapshot **replaces** prior available set). Sequences supported:
+
+- parent snapshot → child spawn **with** snapshot
+- parent snapshot → child spawn → child capability.snapshot
+
+Missing snapshots → no detection. Never infer availability from tool use.
 
 ## Architecture
 

@@ -186,8 +186,8 @@ test('CapabilityTracker: use does not imply available', () => {
     tool: { name: 'bash' },
     action: { type: 'tool.request', arguments: { command: 'ls' } },
   }))
-  assert.deepEqual(caps.availableFor('a1'), [])
-  assert.deepEqual(caps.usedBy('a1'), ['bash'])
+  assert.deepEqual(caps.availableFor('s', 'a1'), [])
+  assert.deepEqual(caps.usedBy('s', 'a1'), ['bash'])
 
   caps.observe(baseEvent({
     event_type: 'capability.snapshot',
@@ -195,7 +195,7 @@ test('CapabilityTracker: use does not imply available', () => {
     agent: { id: 'a1' },
     capability: { available: ['bash', 'read'] },
   }))
-  assert.deepEqual(caps.availableFor('a1'), ['bash', 'read'])
+  assert.deepEqual(caps.availableFor('s', 'a1'), ['bash', 'read'])
 })
 
 test('BehavioralEngine is independent of FlightRecorder', () => {

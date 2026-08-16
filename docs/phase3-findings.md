@@ -7,10 +7,10 @@ VERDICT: PASS
 
 ARCHITECTURE:
   BehavioralEngine is a parallel consumer of normalized events (not dependent on
-  FlightRecorder / persistence). Policy and recorder remain separate.
-  BlockedActionMemory (not "intent"). Normalization levels exact|strong|unknown.
-  CapabilityTracker: available only from snapshots; used from tool requests.
-  No Harness #3, no YAML DSL, no dashboard, no eBPF.
+  FlightRecorder / persistence). Agent state keyed by (session_id, agent_id).
+  Capability snapshots replace (do not accumulate). Delegated timing uses
+  block TTL (5m) + spawn→action window (30s). Privilege expansion is
+  order-independent (spawn-with-snapshot or later child snapshot).
 
 SECURITY:
   Circumvention detections require exact/strong deterministic equivalence only.
@@ -35,10 +35,11 @@ FINDINGS:
   PASS     Multi-event stateful circumvention detections
   PASS     Detector portability across two harness names
   PASS     FP + aggressive normalization negatives
-  PASS     Capability available ≠ used
-  PASS     Detection recursion regression
+  PASS     Session-scoped lineage/capability isolation + hydrate regression
+  PASS     Snapshot replace / capability revocation
+  PASS     Privilege expansion sequences A and B
+  PASS     Delegated timing (TTL + spawn window)
   PARTIAL  Live OpenHands lineage telemetry
-  INFO     Privilege expansion is a medium signal, not auto-malice
 
 PHASE IMPACT:
   Phase 3 behavioral primitive established.

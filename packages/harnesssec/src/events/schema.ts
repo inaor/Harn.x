@@ -138,6 +138,7 @@ export interface HarnessEvent {
     evidence: {
       blocked_event_id: string
       action_event_id: string
+      blocked_tool_event_id?: string
       category: string
       target: string
       window_ms: number

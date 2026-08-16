@@ -122,7 +122,7 @@ export function renderReplay(recorder: FlightRecorder, sessionId: string): strin
   lines.push('')
   if (agent?.agent?.id) {
     lines.push('Capabilities:')
-    lines.push(recorder.capabilities.render(agent.agent.id))
+    lines.push(recorder.capabilities.render(sessionId, agent.agent.id))
   }
 
   return lines.join('\n')

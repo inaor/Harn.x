@@ -9,54 +9,56 @@ import {
 } from './detections.js'
 import { buildDetectionEvent } from './emit.js'
 
+function agentKey(sessionId: string, agentId: string): string {
+  return `${sessionId}\0${agentId}`
+}
+
+interface LineageNode {
+  parent_id: string
+  spawn_timestamp: string
+  spawn_event_id: string
+}
+
 /**
  * Stateful behavioral engine — parallel consumer of normalized HarnessEvents.
- * Does not depend on persistence. Vendor-neutral: never branches on harness.name.
+ * All agent identity state is scoped by (session_id, agent_id).
  */
 export class BehavioralEngine {
   readonly memory = new BlockedActionMemory()
   private readonly raised = new Set<string>()
-  private readonly snapshotObserved = new Set<string>()
+  /** Latest capability.snapshot per (session, agent) — replaced, not accumulated. */
   private readonly snapshotByAgent = new Map<string, string[]>()
-  /** Local event index for resolving policy_decision_for — not a persistence store. */
   private readonly eventsById = new Map<string, HarnessEvent>()
-  /** Explicit parent links observed on events. */
-  private readonly parentByAgent = new Map<string, string>()
-  /** Re-entrancy guard: never process while emitting / nested observe of detections. */
+  /** Explicit parent lineage per (session, child). */
+  private readonly lineageByChild = new Map<string, LineageNode>()
   private observing = false
   private observeDepth = 0
 
   /**
-   * Rebuild blocked-action memory from a prior event stream without emitting detections.
+   * Rebuild state from a prior event stream without emitting detections.
+   * Caller should pass events for one session at a time (recorder does).
    */
   hydrateSession(events: HarnessEvent[]): void {
     for (const event of events) {
       this.indexLocal(event)
       if (event.event_type === 'capability.snapshot' && event.agent?.id && event.capability?.available) {
-        this.snapshotObserved.add(event.agent.id)
-        this.snapshotByAgent.set(event.agent.id, [...event.capability.available].sort())
+        this.setSnapshot(event.session.id, event.agent.id, event.capability.available)
       }
       if (event.event_type === 'policy.decision' && event.policy?.decision === 'block') {
         this.rememberBlock(event)
       }
       if (event.event_type === 'behavior.detection' && event.detection) {
-        const key = `${event.detection.kind}|${event.detection.evidence.blocked_event_id}|${event.detection.evidence.action_event_id}`
-        this.raised.add(key)
+        this.raised.add(this.detectionKey(event.detection.kind, event.detection.evidence))
       }
     }
   }
 
-  /**
-   * Consume one normalized event. Returns zero or more behavior.detection events
-   * for the caller to persist/fan-out. Never recursively observes those detections.
-   */
   observe(event: HarnessEvent): HarnessEvent[] {
     if (this.observing) return []
     if (event.event_type === 'behavior.detection') {
       this.indexLocal(event)
       if (event.detection) {
-        const key = `${event.detection.kind}|${event.detection.evidence.blocked_event_id}|${event.detection.evidence.action_event_id}`
-        this.raised.add(key)
+        this.raised.add(this.detectionKey(event.detection.kind, event.detection.evidence))
       }
       return []
     }
@@ -68,8 +70,11 @@ export class BehavioralEngine {
       this.indexLocal(event)
 
       if (event.event_type === 'capability.snapshot' && event.agent?.id && event.capability?.available) {
-        this.snapshotObserved.add(event.agent.id)
-        this.snapshotByAgent.set(event.agent.id, [...event.capability.available].sort())
+        this.setSnapshot(event.session.id, event.agent.id, event.capability.available)
+        for (const hit of this.privilegeHitsForAgent(event.session.id, event.agent.id, event)) {
+          const det = this.toDetection(hit, event)
+          if (det) out.push(det)
+        }
       }
 
       if (event.event_type === 'policy.decision' && event.policy?.decision === 'block') {
@@ -78,7 +83,7 @@ export class BehavioralEngine {
       }
 
       if (event.event_type === 'subagent.spawned' && event.agent?.id) {
-        for (const hit of this.privilegeHits(event)) {
+        for (const hit of this.privilegeHitsForAgent(event.session.id, event.agent.id, event)) {
           const det = this.toDetection(hit, event)
           if (det) out.push(det)
         }
@@ -97,20 +102,47 @@ export class BehavioralEngine {
     return out
   }
 
-  parentOf(agentId: string): string | undefined {
-    return this.parentByAgent.get(agentId)
+  /** Session-scoped parent lookup. */
+  parentOf(sessionId: string, agentId: string): string | undefined {
+    return this.lineageByChild.get(agentKey(sessionId, agentId))?.parent_id
+  }
+
+  /** Test/helper: latest snapshot for (session, agent). */
+  snapshotFor(sessionId: string, agentId: string): string[] {
+    return [...(this.snapshotByAgent.get(agentKey(sessionId, agentId)) ?? [])]
+  }
+
+  private setSnapshot(sessionId: string, agentId: string, available: string[]): void {
+    this.snapshotByAgent.set(agentKey(sessionId, agentId), [...available].sort())
   }
 
   private indexLocal(event: HarnessEvent): void {
     this.eventsById.set(event.id, event)
-    if (event.agent?.id && event.agent.parent_agent_id) {
-      this.parentByAgent.set(event.agent.id, event.agent.parent_agent_id)
-    }
-    if (event.event_type === 'subagent.spawned' && event.agent?.id && event.agent.parent_agent_id) {
-      this.parentByAgent.set(event.agent.id, event.agent.parent_agent_id)
-    }
-    if (event.links?.parent_agent && event.agent?.id) {
-      this.parentByAgent.set(event.agent.id, event.links.parent_agent)
+    const agentId = event.agent?.id
+    if (!agentId) return
+    const sessionId = event.session.id
+    const k = agentKey(sessionId, agentId)
+
+    const parentId = event.agent?.parent_agent_id
+      ?? (event.links?.parent_agent || undefined)
+      ?? undefined
+
+    if (event.event_type === 'subagent.spawned' && parentId) {
+      this.lineageByChild.set(k, {
+        parent_id: parentId,
+        spawn_timestamp: event.timestamp,
+        spawn_event_id: event.id,
+      })
+      if (event.capability?.available) {
+        this.setSnapshot(sessionId, agentId, event.capability.available)
+      }
+    } else if (parentId && !this.lineageByChild.has(k)) {
+      // Parent link without spawn timestamp — record parent only if spawn unknown.
+      this.lineageByChild.set(k, {
+        parent_id: parentId,
+        spawn_timestamp: event.timestamp,
+        spawn_event_id: event.id,
+      })
     }
   }
 
@@ -143,10 +175,11 @@ export class BehavioralEngine {
     const action = normalizeAction(event)
     if (!isDetectionEligible(action)) return []
     const hits: DetectionHit[] = []
+    const sessionId = event.session.id
 
     const alt = findAlternateCapabilityCircumvention({
       memory: this.memory,
-      sessionId: event.session.id,
+      sessionId,
       agentId,
       action,
       actionTimestamp: event.timestamp,
@@ -154,47 +187,60 @@ export class BehavioralEngine {
     })
     if (alt) hits.push(alt)
 
-    const del = findDelegatedPolicyCircumvention({
-      memory: this.memory,
-      sessionId: event.session.id,
-      agentId,
-      parentOf: (id) => this.parentOf(id),
-      action,
-      actionTimestamp: event.timestamp,
-      actionEventId: event.id,
-    })
-    if (del) hits.push(del)
+    const lineage = this.lineageByChild.get(agentKey(sessionId, agentId))
+    if (lineage) {
+      const del = findDelegatedPolicyCircumvention({
+        memory: this.memory,
+        sessionId,
+        agentId,
+        parentOf: (id) => this.parentOf(sessionId, id),
+        action,
+        actionTimestamp: event.timestamp,
+        actionEventId: event.id,
+        spawnTimestamp: lineage.spawn_timestamp,
+      })
+      if (del) hits.push(del)
+    }
     return hits
   }
 
-  private privilegeHits(event: HarnessEvent): DetectionHit[] {
-    const childId = event.agent?.id
-    const parentId = event.agent?.parent_agent_id ?? undefined
-    if (!childId || !parentId) return []
+  private privilegeHitsForAgent(
+    sessionId: string,
+    agentId: string,
+    trigger: HarnessEvent,
+  ): DetectionHit[] {
+    const lineage = this.lineageByChild.get(agentKey(sessionId, agentId))
+    if (!lineage) return []
+    const parentId = lineage.parent_id
 
-    if (event.capability?.available) {
-      this.snapshotObserved.add(childId)
-      this.snapshotByAgent.set(childId, [...event.capability.available].sort())
-    }
-
-    if (!this.snapshotObserved.has(parentId) || !this.snapshotObserved.has(childId)) {
-      return []
-    }
+    const parentCaps = this.snapshotByAgent.get(agentKey(sessionId, parentId))
+    const childCaps = this.snapshotByAgent.get(agentKey(sessionId, agentId))
+    if (!parentCaps?.length || !childCaps?.length) return []
 
     const hit = findDelegationPrivilegeExpansion({
       parentAgentId: parentId,
-      childAgentId: childId,
-      parentAvailable: this.snapshotByAgent.get(parentId) ?? [],
-      childAvailable: this.snapshotByAgent.get(childId) ?? [],
-      sessionId: event.session.id,
-      spawnEventId: event.id,
-      timestamp: event.timestamp,
+      childAgentId: agentId,
+      parentAvailable: parentCaps,
+      childAvailable: childCaps,
+      sessionId,
+      spawnEventId: lineage.spawn_event_id,
+      timestamp: trigger.timestamp,
     })
     return hit ? [hit] : []
   }
 
+  private detectionKey(
+    kind: string,
+    evidence: { blocked_event_id: string; action_event_id: string; parent_agent_id?: string; child_agent_id?: string },
+  ): string {
+    if (kind === 'agent.delegation_privilege_expansion') {
+      return `${kind}|${evidence.parent_agent_id ?? ''}|${evidence.child_agent_id ?? ''}|${evidence.blocked_event_id}`
+    }
+    return `${kind}|${evidence.blocked_event_id}|${evidence.action_event_id}`
+  }
+
   private toDetection(hit: DetectionHit, trigger: HarnessEvent): HarnessEvent | undefined {
-    const key = `${hit.kind}|${hit.evidence.blocked_event_id}|${hit.evidence.action_event_id}`
+    const key = this.detectionKey(hit.kind, hit.evidence)
     if (this.raised.has(key)) return undefined
     this.raised.add(key)
     return buildDetectionEvent(hit, trigger)
