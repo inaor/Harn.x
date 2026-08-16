@@ -18,7 +18,7 @@
 **[Why Harn.x](#why-harnx)** · **[How it works](#how-it-works)** · **[Detections](#detections)** · **[Harness support](#harness-support)** · **[Quick start](#quick-start)** · **[Security model](#security-model)**
 
 <p align="center">
-  <img src="docs/assets/harnx-hero.svg" alt="Harn.x sits between the agent and tools — context, actions, policy, behavior, lineage — then ALLOW or BLOCK" width="920" />
+  <img src="docs/assets/harnx-hero.png" alt="Harn.x sits between the agent and tools — context, actions, policy, behavior, lineage — then ALLOW or BLOCK" width="920" />
 </p>
 
 Harn.x is an **experimental** open-source security layer for agent harnesses. It observes normalized harness semantics, records agent behavior, enforces pre-execution policy where the adapter allows it, and detects stateful behavioral patterns across a session.
@@ -36,7 +36,7 @@ Agent harnesses often hold additional security-relevant state *before* a tool ru
 Harn.x sits at that layer: adapters normalize harness events; policy can decide **before** side effects; a behavioral engine correlates multi-step patterns that a single syscall never explains.
 
 <p align="center">
-  <img src="docs/assets/harnx-vs-runtime.svg" alt="Traditional runtime view versus Harn.x behavioral view" width="920" />
+  <img src="docs/assets/harnx-vs-runtime.png" alt="Traditional runtime view versus Harn.x behavioral view" width="920" />
 </p>
 
 > Same execution environment. Different security context.
@@ -91,7 +91,7 @@ npm run cli -- detections <session>
 ## How it works
 
 <p align="center">
-  <img src="docs/assets/harnx-layers.svg" alt="Adapters to events to graph to policy to detect" width="920" />
+  <img src="docs/assets/harnx-layers.png" alt="Adapters to events to graph to policy to detect" width="920" />
 </p>
 
 | Layer | Role |

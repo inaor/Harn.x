@@ -19,49 +19,22 @@
       <stop offset="50%" stop-color="#22d3ee" stop-opacity="0.9"/>
       <stop offset="100%" stop-color="#22d3ee" stop-opacity="0"/>
     </linearGradient>
-    <filter id="softGlow" x="-30%" y="-30%" width="160%" height="160%">
-      <feGaussianBlur stdDeviation="6" result="b"/>
-      <feMerge>
-        <feMergeNode in="b"/>
-        <feMergeNode in="SourceGraphic"/>
-      </feMerge>
-    </filter>
-    <filter id="softGlowV" x="-30%" y="-30%" width="160%" height="160%">
-      <feGaussianBlur stdDeviation="8" result="b"/>
-      <feMerge>
-        <feMergeNode in="b"/>
-        <feMergeNode in="SourceGraphic"/>
-      </feMerge>
-    </filter>
   </defs>
-
   <rect width="960" height="520" rx="24" fill="url(#bg)"/>
   <circle cx="820" cy="80" r="120" fill="#7c3aed" opacity="0.12"/>
   <circle cx="100" cy="440" r="100" fill="#22d3ee" opacity="0.08"/>
   <circle cx="480" cy="260" r="160" fill="#ec4899" opacity="0.05"/>
-
-  <!-- MODEL -->
   <rect x="400" y="28" width="160" height="44" rx="12" fill="url(#card)" stroke="#334155" stroke-width="1.5"/>
   <text x="480" y="55" text-anchor="middle" fill="#e2e8f0" font-family="ui-sans-serif, system-ui, sans-serif" font-size="15" font-weight="700">MODEL</text>
-
   <line x1="480" y1="72" x2="480" y2="98" stroke="url(#cyanGlow)" stroke-width="2"/>
   <polygon points="480,104 474,94 486,94" fill="#22d3ee"/>
-
-  <!-- AI AGENT -->
   <rect x="380" y="108" width="200" height="44" rx="12" fill="url(#card)" stroke="#64748b" stroke-width="1.5"/>
   <text x="480" y="135" text-anchor="middle" fill="#f1f5f9" font-family="ui-sans-serif, system-ui, sans-serif" font-size="15" font-weight="700">AI AGENT</text>
-
   <line x1="480" y1="152" x2="480" y2="178" stroke="url(#cyanGlow)" stroke-width="2"/>
   <polygon points="480,184 474,174 486,174" fill="#22d3ee"/>
-
-  <!-- Harn.x core -->
-  <g filter="url(#softGlowV)">
-    <rect x="300" y="188" width="360" height="188" rx="20" fill="url(#core)" stroke="#22d3ee" stroke-width="2" opacity="0.95"/>
-  </g>
+  <rect x="300" y="188" width="360" height="188" rx="20" fill="url(#core)" stroke="#22d3ee" stroke-width="2" opacity="0.95"/>
   <text x="480" y="218" text-anchor="middle" fill="#22d3ee" font-family="ui-sans-serif, system-ui, sans-serif" font-size="22" font-weight="800" letter-spacing="1">Harn.x</text>
-  <text x="480" y="240" text-anchor="middle" fill="#a78bfa" font-family="ui-sans-serif, system-ui, sans-serif" font-size="11" font-weight="600">EXPERIMENTAL · HARNESS LAYER</text>
-
-  <!-- chips -->
+  <text x="480" y="240" text-anchor="middle" fill="#a78bfa" font-family="ui-sans-serif, system-ui, sans-serif" font-size="11" font-weight="600">EXPERIMENTAL - HARNESS LAYER</text>
   <g font-family="ui-sans-serif, system-ui, sans-serif" font-size="12" font-weight="600">
     <rect x="328" y="258" width="90" height="28" rx="8" fill="#0f172a" stroke="#22d3ee" stroke-opacity="0.5"/>
     <text x="373" y="276" text-anchor="middle" fill="#e2e8f0">Context</text>
@@ -74,36 +47,21 @@
     <rect x="480" y="300" width="100" height="28" rx="8" fill="#0f172a" stroke="#a78bfa" stroke-opacity="0.5"/>
     <text x="530" y="318" text-anchor="middle" fill="#e2e8f0">Lineage</text>
   </g>
-
-  <text x="480" y="355" text-anchor="middle" fill="#94a3b8" font-family="ui-sans-serif, system-ui, sans-serif" font-size="12">Record · Understand · Detect · Stop</text>
-
+  <text x="480" y="355" text-anchor="middle" fill="#94a3b8" font-family="ui-sans-serif, system-ui, sans-serif" font-size="12">Record Â· Understand Â· Detect Â· Stop</text>
   <line x1="480" y1="376" x2="480" y2="402" stroke="url(#cyanGlow)" stroke-width="2"/>
   <polygon points="480,408 474,398 486,398" fill="#22d3ee"/>
-
-  <!-- ALLOW / BLOCK -->
   <rect x="390" y="412" width="180" height="36" rx="10" fill="#0f172a" stroke="#ec4899" stroke-width="1.5"/>
   <text x="480" y="435" text-anchor="middle" fill="#f9a8d4" font-family="ui-sans-serif, system-ui, sans-serif" font-size="13" font-weight="700">ALLOW  /  BLOCK</text>
-
   <line x1="480" y1="448" x2="480" y2="468" stroke="#64748b" stroke-width="2"/>
   <polygon points="480,474 474,464 486,464" fill="#94a3b8"/>
-
-  <!-- TOOL -->
   <rect x="400" y="478" width="160" height="32" rx="10" fill="url(#card)" stroke="#475569" stroke-width="1.5"/>
   <text x="480" y="499" text-anchor="middle" fill="#cbd5e1" font-family="ui-sans-serif, system-ui, sans-serif" font-size="14" font-weight="700">TOOL</text>
-
-  <!-- Harness feeders -->
-  <g filter="url(#softGlow)">
-    <rect x="48" y="230" width="150" height="56" rx="14" fill="#12161f" stroke="#22d3ee" stroke-width="1.5"/>
-  </g>
+  <rect x="48" y="230" width="150" height="56" rx="14" fill="#12161f" stroke="#22d3ee" stroke-width="1.5"/>
   <text x="123" y="254" text-anchor="middle" fill="#67e8f9" font-family="ui-sans-serif, system-ui, sans-serif" font-size="12" font-weight="700">DeepSeek DSH</text>
   <text x="123" y="272" text-anchor="middle" fill="#94a3b8" font-family="ui-sans-serif, system-ui, sans-serif" font-size="10">adapter</text>
-
-  <g filter="url(#softGlow)">
-    <rect x="48" y="310" width="150" height="56" rx="14" fill="#12161f" stroke="#a78bfa" stroke-width="1.5"/>
-  </g>
+  <rect x="48" y="310" width="150" height="56" rx="14" fill="#12161f" stroke="#a78bfa" stroke-width="1.5"/>
   <text x="123" y="334" text-anchor="middle" fill="#c4b5fd" font-family="ui-sans-serif, system-ui, sans-serif" font-size="12" font-weight="700">OpenHands</text>
   <text x="123" y="352" text-anchor="middle" fill="#94a3b8" font-family="ui-sans-serif, system-ui, sans-serif" font-size="10">adapter</text>
-
   <path d="M198 258 C260 258, 270 270, 300 278" fill="none" stroke="#22d3ee" stroke-width="1.75" opacity="0.75"/>
   <path d="M198 338 C260 338, 270 320, 300 310" fill="none" stroke="#a78bfa" stroke-width="1.75" opacity="0.75"/>
   <text x="248" y="300" text-anchor="middle" fill="#94a3b8" font-family="ui-sans-serif, system-ui, sans-serif" font-size="11" font-weight="600">normalized events</text>
