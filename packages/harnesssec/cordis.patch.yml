@@ -1,0 +1,6 @@
+- insert:
+    - id: harnesssec
+      name: harnesssec
+      config:
+        enforce: true
+        verbose: true

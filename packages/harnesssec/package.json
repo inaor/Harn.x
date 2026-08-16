@@ -1,0 +1,41 @@
+{
+  "name": "harnesssec",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Harness-native flight recorder and policy for AI agent harnesses",
+  "bin": {
+    "harnesssec": "./dist/cli/main.js"
+  },
+  "exports": {
+    ".": "./dist/index.js",
+    "./adapters/deepseek": "./dist/adapters/deepseek/index.js"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "demo": "node --import tsx src/cli/main.ts demo",
+    "test": "node --import tsx --test tests/*.test.ts",
+    "cli": "node --import tsx src/cli/main.ts"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "*"
+  },
+  "peerDependenciesMeta": {
+    "@deepseek-ai/cordis": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.10",
+    "tsx": "^4.19.3",
+    "typescript": "^5.8.2"
+  }
+}

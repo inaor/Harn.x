@@ -1,0 +1,10 @@
+# Upstream research checkout. Do not vendor the full tree.
+deepseek-harness/
+
+node_modules/
+dist/
+packages/*/dist/
+packages/*/node_modules/
+.DS_Store
+*.log
+.harnesssec/
