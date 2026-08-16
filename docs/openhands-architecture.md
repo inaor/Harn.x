@@ -301,6 +301,6 @@ Hooks run **inside** the Agent Server / LocalConversation process (sandbox when 
 | Deny before side effect | `block_action` before tool body — **available** |
 | Same Harn.x policy | Adapter must normalize `terminal`→shell semantics — **no rule rewrite** |
 | Blind spots | Documented bash/file HTTP + `execute_tool` — **real** |
-| Core changes | Only if schema lacks harness-generic fields (e.g. `harness.name` union) |
+| Core changes | None for harness identity — `HarnessName` is an open string |
 
 Phase 2 implementation must keep all vendor mapping under `packages/harnesssec/src/adapters/openhands/` and treat PreToolUse as the peer of DeepSeek `tools/pre-execute`.

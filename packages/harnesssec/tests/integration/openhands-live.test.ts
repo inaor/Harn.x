@@ -48,11 +48,19 @@ test('LIVE OpenHands: BLOCK / ALLOW / bypass via PreToolUse adapter', (t) => {
   assert.deepEqual(labels, ['BLOCK', 'ALLOW', 'bypass-execute_tool'])
   assert.equal(payload.results[0].proof_exists, false)
   assert.equal(payload.results[0].userprompt_provenance, true)
+  assert.equal(
+    payload.results[0].source_hook,
+    'openhands:UserPromptSubmit',
+    'BLOCK context must originate from real UserPromptSubmit (not openhands-seed)',
+  )
+  assert.equal(payload.results[0].context_before_tool, true)
   assert.ok(
     payload.results[0].block_rules.includes('untrusted-context-sensitive-tool'),
     'BLOCK must use untrusted-context rule (UserPromptSubmit chain)',
   )
   assert.equal(payload.results[1].proof_exists, true)
   assert.equal(payload.results[1].userprompt_provenance, true)
+  assert.equal(payload.results[1].source_hook, 'openhands:UserPromptSubmit')
+  assert.equal(payload.results[1].context_before_tool, true)
   assert.equal(payload.results[2].proof_exists, true)
 })

@@ -1,0 +1,17 @@
+{
+  "title": "Docs claim open HarnessName but schema is closed union",
+  "body": "Fixture for Guardian self-test",
+  "files": [
+    {
+      "filename": "docs/phase2-final-validation.md",
+      "status": "modified",
+      "patch": "@@ -1,3 +1,6 @@\n+# Phase 2\n+\n+| `HarnessName` as extensible string | Avoid per-adapter schema edits |\n+| without core edits for a third adapter | required |\n"
+    },
+    {
+      "filename": "packages/harnesssec/src/events/schema.ts",
+      "status": "modified",
+      "patch": "@@ -50,8 +50,8 @@\n-export type HarnessName = string\n-    name: HarnessName\n+export type HarnessName = 'deepseek-dsh' | 'openhands'\n+    name: 'deepseek-dsh' | 'openhands'\n"
+    }
+  ],
+  "expected_verdicts": ["REQUEST_CHANGES", "BLOCK"]
+}

@@ -62,7 +62,7 @@ Harn.x core models these as normalized events + policy + graph — **not** as Co
 | Question | Evidence |
 |---|---|
 | Same policy both harnesses? | Yes — `defaultRules` unchanged; OpenHands maps `terminal`→`bash` |
-| Schema change required? | Minimal — `harness.name` union adds `'openhands'` (harness-generic identity) |
+| Schema change required? | No per-adapter edits — `export type HarnessName = string` |
 | Core rewrite? | No |
 | Denial before side effect? | Yes on ActionEvent / tools/pre-execute paths |
 | Blind spots structurally similar? | Yes — direct capability seams (`ctx.shell` ↔ `execute_tool` / bash API) |

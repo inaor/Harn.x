@@ -20,7 +20,7 @@ Alternative considered: **PARTIAL** — only if `openhands-seed` were treated as
 VERDICT: REQUEST CHANGES → cleared after BLOCKER fixes in-tree
 
 ARCHITECTURE:
-  Adapter-only OpenHands integration. Core change limited to harness.name union.
+  Adapter-only OpenHands integration. Core `HarnessName` is an open string.
   Layers match contract (adapter → events → policy). No Phase 3 DSL shipped.
 
 SECURITY:
@@ -40,10 +40,9 @@ FINDINGS:
   BLOCKER  .gitignore previously matched **/openhands/ and excluded
            packages/harnesssec/src/adapters/openhands/ from git — FIXED (root-anchored)
   HIGH     openhands-hook used exit 1 on error → OpenHands fail-open — FIXED (exit 2 deny)
-  MEDIUM   Live demo seeds untrusted context via openhands-seed in addition to
-           message markers; UserPromptSubmit hook not wired in live script
+  RESOLVED Live path uses UserPromptSubmit only (openhands-seed is demo-only)
   MEDIUM   browser*→web_fetch synonym is a coarse semantic map (adapter-local)
-  LOW      harness.name schema widened — justified universal primitive
+  LOW      harness.name made extensible (`export type HarnessName = string`)
   INFO     Turn metadata is adapter session sidecar (OpenHands has no DSH turn)
 
 PHASE IMPACT:
@@ -51,8 +50,8 @@ PHASE IMPACT:
   Phase 3 behavioral language remains FORBIDDEN until explicit start.
 
 NEXT ACTION:
-  1. Commit/push including adapters/openhands (gitignore fix critical)
-  2. Optional: wire UserPromptSubmit in live harness for pure OH provenance path
+  1. Keep Phase 2.1 reconciled (open HarnessName + UserPromptSubmit-only live proof)
+  2. Guardian self-test fixture must stay green
   3. Do not start Phase 3 until product owner accepts this PASS
 ```
 
@@ -70,10 +69,10 @@ NEXT ACTION:
 
 | # | Answer |
 |---|---|
-| Core files changed | 1 semantic: `events/schema.ts` (`harness.name`) |
-| Why | Universal harness identity; DeepSeek still maps |
+| Core files changed | `events/schema.ts` (`HarnessName = string`); policy copies `event.harness` |
+| Why | Universal harness identity without per-adapter core edits |
 | Rules changed | 0 |
-| Schema change | Minimal union only |
+| Schema change | Open string (not a closed vendor union) |
 | DeepSeek tests | Pass unchanged |
 | Same policy both | Yes (`defaultRules`) |
 | Vendor in core | No |

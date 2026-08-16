@@ -45,34 +45,48 @@ def _session_events(store: Path, session_id: str) -> list[dict]:
 
 
 def _assert_userprompt_provenance(store: Path, session_id: str, label: str) -> dict:
+    """Canonical proof: context.introduced from UserPromptSubmit before tool.requested."""
     events = _session_events(store, session_id)
-    introduced = [
-        e
-        for e in events
+
+    # Exact provenance: raw.source_hook must be openhands:UserPromptSubmit
+    ups_contexts = [
+        (i, e)
+        for i, e in enumerate(events)
         if e.get("event_type") == "context.introduced"
         and (e.get("context") or {}).get("trust") == "untrusted"
+        and (e.get("raw") or {}).get("source_hook") == "openhands:UserPromptSubmit"
     ]
-    assert introduced, f"{label}: missing context.introduced(untrusted) from UserPromptSubmit"
-    from_ups = [
-        e
-        for e in introduced
-        if (e.get("raw") or {}).get("source_hook") == "openhands:UserPromptSubmit"
-        or (e.get("context") or {}).get("source") == "UserPromptSubmit"
-    ]
-    assert from_ups, (
-        f"{label}: untrusted context must come from UserPromptSubmit "
-        f"(got hooks={[ (e.get('raw') or {}).get('source_hook') for e in introduced ]})"
+    assert ups_contexts, (
+        f"{label}: required context.introduced with "
+        f'raw.source_hook == "openhands:UserPromptSubmit" '
+        f"(got {[((e.get('raw') or {}).get('source_hook'), e.get('event_type')) for e in events]})"
     )
-    # Ensure synthetic seed path was not used
-    for e in introduced:
+
+    first_ups_idx, first_ups = ups_contexts[0]
+
+    tool_idxs = [
+        i
+        for i, e in enumerate(events)
+        if e.get("event_type") == "tool.requested"
+    ]
+    assert tool_idxs, f"{label}: missing tool.requested after UserPromptSubmit"
+    assert first_ups_idx < tool_idxs[0], (
+        f"{label}: context.introduced (UserPromptSubmit) must precede tool.requested "
+        f"(ctx_idx={first_ups_idx}, tool_idx={tool_idxs[0]})"
+    )
+
+    # Ban synthetic seed in the canonical session
+    for e in events:
         hook = (e.get("raw") or {}).get("source_hook")
         assert hook != "openhands:seed-untrusted-context", (
             f"{label}: openhands-seed must not appear in portability evidence"
         )
+
     return {
-        "context_introduced": len(introduced),
+        "context_introduced": len(ups_contexts),
         "userprompt_provenance": True,
-        "source_hook": (from_ups[0].get("raw") or {}).get("source_hook"),
+        "source_hook": "openhands:UserPromptSubmit",
+        "context_before_tool": True,
     }
 
 

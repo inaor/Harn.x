@@ -30,7 +30,7 @@ Phase 3 behavioral detection language must **not** start until product owner exp
 | Live test used `openhands-seed` | Removed from canonical live path |
 | Untrusted context not from OpenHands | Wired `UserPromptSubmit` hook on live Conversation |
 | Provenance chain weak (credential-only block) | BLOCK uses `untrusted-context-sensitive-tool` (curl after untrusted) |
-| `harness.name` closed union | Extensible `HarnessName` string + constants |
+| `harness.name` closed union | Extensible `export type HarnessName = string` (+ convenience constants) |
 | Independent review missing | GitHub Guardian workflow after CI |
 
 `openhands-seed` remains a **developer/demo utility only**.
@@ -89,7 +89,7 @@ npm ci && npm run build && npm test && npm run test:integration
 
 | Change | Why universal | DeepSeek impact |
 |---|---|---|
-| `HarnessName` as extensible string | Avoid per-adapter schema edits | Defaults remain `deepseek-dsh` |
+| `export type HarnessName = string` | Avoid per-adapter schema edits | Defaults remain `deepseek-dsh` |
 | Policy events copy `event.harness` | Preserve producer identity | DSH events still branded correctly |
 
 No rule rewrites. No Phase 3 detection language.
@@ -106,7 +106,8 @@ No rule rewrites. No Phase 3 detection language.
 | Secrets | `GITHUB_TOKEN` only (`contents:read`, `actions:read`, `pull-requests:write`) — no write-capable custom secrets for untrusted code |
 | Output | PR review comment: `PASS` / `REQUEST_CHANGES` / `BLOCK` |
 | Contract | Reads `docs/architecture-contract.md` |
-| Checks | vendor-in-core, causality, secret persistence, enforcement claims, bypass/docs, policy+tests, schema drift, docs drift, premature Phase 3 |
+| Checks | vendor-in-core, causality, secret persistence, enforcement claims, bypass/docs, policy+tests, schema drift, **HarnessName docs/code mismatch**, premature Phase 3 |
+| Self-test | `.github/guardian/self-test.mjs` + fixture `fixtures/harness-name-mismatch.json` (docs claim open + closed union → REQUEST_CHANGES/BLOCK) |
 
 Workflow: `.github/workflows/guardian.yml`  
 Script: `.github/guardian/review.mjs`
@@ -118,6 +119,7 @@ Script: `.github/guardian/review.mjs`
 - [x] Real OpenHands provenance integration test (UserPromptSubmit)
 - [x] Green unit + integration CI matrix
 - [x] GitHub Guardian workflow/config
+- [x] Guardian HarnessName docs/code mismatch self-test
 - [x] This document
 
 **Do not start Phase 3 from this document alone.**
