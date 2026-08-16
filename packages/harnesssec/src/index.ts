@@ -9,7 +9,8 @@ import {
   Config,
 } from './adapters/deepseek/index.js'
 
-export type { HarnessEvent, EventType, TrustLevel } from './events/schema.js'
+export type { HarnessEvent, EventType, TrustLevel, HarnessName } from './events/schema.js'
+export { HARNESS_DEEPSEEK_DSH, HARNESS_OPENHANDS } from './events/schema.js'
 export { FlightRecorder } from './core/recorder.js'
 export { PolicyEngine } from './policy/engine.js'
 export { defaultRules } from './policy/rules.js'

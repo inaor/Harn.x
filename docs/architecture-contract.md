@@ -43,11 +43,12 @@ Vendor-specific details stay in adapters. Core stays vendor-neutral.
 |---|---|
 | 1 DeepSeek | Live pre-exec BLOCK + ALLOW + documented bypass |
 | 2 OpenHands | Same core/rules; different adapter; portability proven or fail honestly |
-| 3 Behavioral model | Only after Phase 2 PASS |
+| 2.1 Close proof | UserPromptSubmit provenance (no seed in live proof) + independent GitHub Guardian |
+| 3 Behavioral model | Only after Phase 2/2.1 PASS and explicit start |
 | 4 Third harness | Materially different ecosystem |
 | 5 Distribution | Only after abstraction is credible |
 
-**Do not start Phase 3 until Phase 2 is reviewed PASS.**
+**Do not start Phase 3 until Phase 2.1 final validation is accepted.**
 
 ## Phase 2 verdict vocabulary
 

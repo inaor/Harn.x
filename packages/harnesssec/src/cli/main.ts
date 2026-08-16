@@ -51,8 +51,9 @@ async function main(): Promise<void> {
       console.log('    HARNX_STORE=<dir> node <path>/dist/adapters/openhands/hook-cli.js')
       console.log('  or:  harnesssec openhands-hook   (stdin = HookEvent JSON)')
       console.log('')
-      console.log('Seed untrusted context for demos:')
+      console.log('Seed untrusted context for demos (NOT portability evidence):')
       console.log('  harnesssec openhands-seed --session <id> --store <dir>')
+      console.log('  Live portability tests must use UserPromptSubmit instead.')
       console.log('')
       console.log(`Flight records write to: ${dir}`)
       return

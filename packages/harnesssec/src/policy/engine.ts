@@ -47,7 +47,10 @@ export class PolicyEngine {
       const reason = rule.reason(event, ctx)
       const decisionEvent = baseEvent({
         event_type: 'policy.decision',
+        harness: event.harness,
         session: event.session,
+        turn: event.turn,
+        step: event.step,
         agent: event.agent,
         tool: event.tool,
         action: event.action,
@@ -75,7 +78,10 @@ export class PolicyEngine {
 
     const allowEvent = baseEvent({
       event_type: 'policy.decision',
+      harness: event.harness,
       session: event.session,
+      turn: event.turn,
+      step: event.step,
       agent: event.agent,
       tool: event.tool,
       policy: { decision: 'allow', reason: 'no matching rule' },
@@ -96,7 +102,10 @@ export class PolicyEngine {
 
     this.recorder.record(baseEvent({
       event_type: 'policy.aftermath',
+      harness: nextToolEvent.harness,
       session: nextToolEvent.session,
+      turn: nextToolEvent.turn,
+      step: nextToolEvent.step,
       agent: nextToolEvent.agent,
       tool: nextToolEvent.tool,
       action: nextToolEvent.action,

@@ -4,6 +4,16 @@ export type TrustLevel = 'trusted' | 'untrusted' | 'unknown'
 
 export type PolicyDecisionKind = 'allow' | 'alert' | 'block' | 'terminate'
 
+/**
+ * Branded harness identifier. Adapters supply their own string;
+ * core does not require a union update for each new harness.
+ */
+export type HarnessName = string & { readonly __brand?: 'HarnessName' }
+
+/** Convenience constants — not an exhaustive enum. */
+export const HARNESS_DEEPSEEK_DSH: HarnessName = 'deepseek-dsh'
+export const HARNESS_OPENHANDS: HarnessName = 'openhands'
+
 export type EventType =
   | 'session.started'
   | 'session.ended'
@@ -52,8 +62,12 @@ export interface HarnessEvent {
   timestamp: string
   event_type: EventType
   harness: {
-    /** Which agent harness produced this event. Adapter-set; core stays harness-agnostic. */
-    name: 'deepseek-dsh' | 'openhands'
+    /**
+     * Which agent harness produced this event.
+     * Adapter-set branded string — extensible without core edits per vendor.
+     * Known values include `deepseek-dsh` and `openhands`.
+     */
+    name: HarnessName
     version?: string
   }
   session: {

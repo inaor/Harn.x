@@ -1,0 +1,138 @@
+# Harn.x Guardian — independent architecture/security review.
+#
+# Triggers after CI completes for a pull_request. Deterministic CI remains the
+# required merge gate; Guardian never auto-merges.
+#
+# Security:
+# - Runs in base-repo context (workflow_run), so GITHUB_TOKEN can comment on fork PRs.
+# - Checks out the DEFAULT BRANCH only — never executes untrusted PR code.
+# - Reviews the PR diff via GitHub API.
+# - No write-capable custom secrets; only GITHUB_TOKEN with minimal scopes.
+
+name: Guardian
+
+on:
+  workflow_run:
+    workflows: ['CI']
+    types: [completed]
+
+permissions:
+  contents: read
+  actions: read
+  pull-requests: write
+
+jobs:
+  review:
+    if: github.event.workflow_run.event == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout default branch (trusted Guardian + contract)
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+
+      - name: Resolve PR number from CI head SHA
+        id: pr
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          SHA="${{ github.event.workflow_run.head_sha }}"
+          PR_JSON=$(gh api "repos/${{ github.repository }}/commits/${SHA}/pulls" --jq '.[0]')
+          if [ -z "$PR_JSON" ] || [ "$PR_JSON" = "null" ]; then
+            # Fallback: list open PRs matching head sha
+            NUM=$(gh pr list --state open --json number,headRefOid --jq ".[] | select(.headRefOid==\"${SHA}\") | .number" | head -1)
+          else
+            NUM=$(echo "$PR_JSON" | jq -r '.number')
+          fi
+          if [ -z "${NUM:-}" ] || [ "$NUM" = "null" ]; then
+            echo "No PR found for ${SHA}; skipping Guardian comment."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "number=${NUM}" >> "$GITHUB_OUTPUT"
+          echo "skip=false" >> "$GITHUB_OUTPUT"
+          echo "sha=${SHA}" >> "$GITHUB_OUTPUT"
+
+      - name: Fetch PR files + run Guardian (trusted script)
+        if: steps.pr.outputs.skip != 'true'
+        id: guardian
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CI_CONCLUSION: ${{ github.event.workflow_run.conclusion }}
+        run: |
+          set -euo pipefail
+          PR="${{ steps.pr.outputs.number }}"
+          TITLE=$(gh pr view "$PR" --json title --jq .title)
+          BODY=$(gh pr view "$PR" --json body --jq .body)
+          FILES=$(gh api "repos/${{ github.repository }}/pulls/${PR}/files" --paginate)
+          PAYLOAD=$(jq -n --arg title "$TITLE" --arg body "$BODY" --argjson files "$FILES" '{title:$title, body:$body, files:$files}')
+          echo "$PAYLOAD" | node .github/guardian/review.mjs > /tmp/guardian-out.json
+          cat /tmp/guardian-out.json
+
+          VERDICT=$(jq -r .verdict /tmp/guardian-out.json)
+          if [ "$CI_CONCLUSION" != "success" ]; then
+            VERDICT="BLOCK"
+            jq --arg v "$VERDICT" '.verdict=$v | .findings += [{"severity":"BLOCKER","file":"CI","message":"Deterministic CI did not succeed; Guardian cannot PASS"}]' \
+              /tmp/guardian-out.json > /tmp/guardian-out2.json
+            mv /tmp/guardian-out2.json /tmp/guardian-out.json
+          fi
+          echo "verdict=$(jq -r .verdict /tmp/guardian-out.json)" >> "$GITHUB_OUTPUT"
+
+          {
+            echo "## Harn.x Guardian"
+            echo ""
+            echo "**Verdict:** \`$(jq -r .verdict /tmp/guardian-out.json)\`"
+            echo ""
+            echo "CI conclusion: \`${CI_CONCLUSION}\` (CI remains the required merge gate; Guardian does not auto-merge)."
+            echo ""
+            echo "Contract: \`docs/architecture-contract.md\`"
+            echo ""
+            echo "### Findings"
+            jq -r '
+              if (.findings|length)==0 then "- (none)"
+              else .findings[] | "- **\(.severity)** \(.file): \(.message)"
+              end
+            ' /tmp/guardian-out.json
+            echo ""
+            echo "### Checks covered"
+            echo "- vendor leakage into core"
+            echo "- unsupported causality"
+            echo "- raw secret persistence risks"
+            echo "- enforcement claims vs integration evidence"
+            echo "- undocumented bypass / adapter changes"
+            echo "- policy changes without tests"
+            echo "- event-schema drift"
+            echo "- docs/code drift"
+            echo "- premature later-phase work"
+          } > /tmp/guardian-body.md
+
+      - name: Post PR review
+        if: steps.pr.outputs.skip != 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          PR="${{ steps.pr.outputs.number }}"
+          VERDICT="${{ steps.guardian.outputs.verdict }}"
+          BODY=$(cat /tmp/guardian-body.md)
+
+          case "$VERDICT" in
+            PASS)
+              gh pr review "$PR" --comment --body "$BODY"
+              ;;
+            REQUEST_CHANGES)
+              gh pr review "$PR" --request-changes --body "$BODY"
+              ;;
+            BLOCK)
+              gh pr review "$PR" --request-changes --body "$BODY"
+              ;;
+            *)
+              gh pr review "$PR" --comment --body "$BODY"
+              ;;
+          esac
+
+          # Surface in Actions UI; do not fail the job on REQUEST_CHANGES so
+          # CI remains the sole hard merge gate unless branch protection adds Guardian.
+          echo "Guardian verdict: ${VERDICT}"

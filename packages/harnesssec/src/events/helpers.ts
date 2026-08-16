@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import type { EventType, HarnessEvent, TrustLevel } from './schema.js'
+import { HARNESS_DEEPSEEK_DSH } from './schema.js'
 
 export function newEventId(): string {
   return `evt_${randomUUID().replace(/-/g, '').slice(0, 16)}`
@@ -85,7 +86,7 @@ export function baseEvent(
   return {
     id: partial.id ?? newEventId(),
     timestamp: partial.timestamp ?? nowIso(),
-    harness: partial.harness ?? { name: 'deepseek-dsh' },
+    harness: partial.harness ?? { name: HARNESS_DEEPSEEK_DSH },
     event_type: partial.event_type,
     session: partial.session,
     ...partial.turn !== undefined ? { turn: partial.turn } : {},

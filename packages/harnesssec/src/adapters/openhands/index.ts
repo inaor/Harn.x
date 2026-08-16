@@ -18,9 +18,9 @@ import {
   extractShellCommand,
 } from '../../events/helpers.js'
 import type { HarnessEvent, TrustLevel } from '../../events/schema.js'
-import { isMcpToolName, parseMcpToolName } from '../../events/schema.js'
+import { HARNESS_OPENHANDS, isMcpToolName, parseMcpToolName } from '../../events/schema.js'
 
-export const HARNESS_NAME = 'openhands' as const
+export const HARNESS_NAME = HARNESS_OPENHANDS
 
 /** OpenHands HookEvent JSON (stdin contract from HookExecutor). */
 export interface OpenHandsHookEvent {
@@ -125,8 +125,8 @@ function ensureSession(
 }
 
 /**
- * Seed same-turn untrusted context for the portability demo / tests.
- * Does not change core policy — only writes normalized events.
+ * Developer/demo helper — seed same-turn untrusted context without OpenHands hooks.
+ * NOT portability evidence. Live tests must use UserPromptSubmit instead.
  */
 export function seedUntrustedContext(
   storeDir: string,
