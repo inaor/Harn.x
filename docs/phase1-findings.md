@@ -11,6 +11,8 @@ Live DeepSeek Harness execution demonstrated:
 - Agent-loop model → bash blocked
 - Bypass via `ctx.shell` documented as a blind spot
 
+Architecture-review + Phase 1.5b fixes (persist-only redaction with raw in-memory telemetry, no sticky provenance, MCP trust matrix, bash/pwsh not unconditionally sensitive) are covered by `tests/phase15b-regression.test.ts` + `tests/architecture-regression.test.ts` and green CI (`npm ci` / `build` / `test` / `test:integration`).
+
 See [`phase1-live-validation.md`](./phase1-live-validation.md) and [`blind-spots.md`](./blind-spots.md).
 
 ---
@@ -29,10 +31,12 @@ See [`phase1-live-validation.md`](./phase1-live-validation.md) and [`blind-spots
 |---|---|---|
 | Execution proof | Simulated demo events | Real `dsh-tools` + bash + agent-loop |
 | Side-effect proof | Claimed | `/tmp/harnx-proof` absent after BLOCK |
-| Causality links | Over-claimed `caused_by` / sticky context | `candidate_context_source` / `correlated_with`; turn-scoped |
-| MCP | Alert on all `mcp__*` | trusted / untrusted / unknown registry |
-| Secrets | Persisted raw | Redacted before disk |
-| CI | None | build + unit + integration |
+| Causality links | Over-claimed `caused_by` / sticky context | `candidate_context_source` / `correlated_with`; turn-scoped only (`latestUntrusted` removed) |
+| MCP | Alert on all `mcp__*` / unknown conflated | trusted → allow; unknown → allow/log; untrusted → alert (`event.mcp.trust`) |
+| Shell sensitivity | bash/pwsh treated as inherently sensitive (`SENSITIVE_TOOLS`) | No unconditional bash/pwsh; command semantics or explicit `sensitivity=high`; `git status` / `npm test` ALLOW under untrusted |
+| Secrets | Persisted raw / redacted before policy | `record()` keeps raw; policy inspects secrets in memory; only `persist()` writes redacted clone |
+| CI | None / incomplete | `npm ci` + build + unit + `test:integration` (clean checkout) |
+| Regression | Scattered | `phase15b-regression.test.ts` (shell + raw telemetry) + `architecture-regression.test.ts` |
 
 ---
 

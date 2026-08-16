@@ -27,6 +27,10 @@ test('redaction strips secret values before persist', () => {
         },
       },
     }))
+    const mem = recorder.getSession('redact-s1')!.events[0]
+    assert.equal((mem.action!.arguments as any).api_key, 'sk-abcdefghijklmnopqrstuvwxyz012345')
+    assert.equal((mem.action!.arguments as any).password, 'super-secret')
+
     const raw = readFileSync(join(dir, 'redact-s1.json'), 'utf8')
     assert.doesNotMatch(raw, /sk-abcdefghijklmnopqrstuvwxyz012345/)
     assert.doesNotMatch(raw, /super-secret/)

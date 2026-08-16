@@ -18,22 +18,24 @@ export function textExcerpt(value: unknown, max = 240): string | undefined {
 
 export function classifyToolSensitivity(toolName: string, args: unknown): 'low' | 'medium' | 'high' {
   const name = toolName.toLowerCase()
-  if (name === 'bash' || name === 'pwsh' || name.startsWith('mcp__') || name.includes('shell')) {
-    if (looksSensitiveCommand(args)) return 'high'
-    return 'medium'
+  // bash/pwsh are not inherently risky — classify by command semantics.
+  if (name === 'bash' || name === 'pwsh' || name.includes('shell')) {
+    return looksSensitiveCommand(args) ? 'high' : 'low'
   }
+  if (name.startsWith('mcp__')) return 'medium'
   if (name === 'web_fetch' || name === 'web_search') return 'medium'
   if (name.includes('write') || name.includes('edit') || name.includes('delete')) return 'medium'
   return 'low'
 }
 
 const SENSITIVE_PATH = /(?:^|[\s"'`=])(~?\/\.ssh\/|~?\/\.aws\/|id_rsa|id_ed25519|credentials|\.env(?:\.local)?|\/etc\/shadow)/i
-const SENSITIVE_CMD = /\b(curl|wget|nc|ncat|scp|ssh)\b/i
+const EXFIL_CMD = /\b(curl|wget|nc|ncat|scp)\b/i
+const DESTRUCTIVE_CMD = /\b(rm\s+-rf|mkfs|dd\s+if=)\b/i
 
 export function looksSensitiveCommand(args: unknown): boolean {
   const command = extractShellCommand(args)
   if (!command) return false
-  return SENSITIVE_PATH.test(command) || SENSITIVE_CMD.test(command)
+  return SENSITIVE_PATH.test(command) || EXFIL_CMD.test(command) || DESTRUCTIVE_CMD.test(command)
 }
 
 export function extractShellCommand(args: unknown): string | undefined {

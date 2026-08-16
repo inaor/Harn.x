@@ -92,12 +92,41 @@ Documented in [`blind-spots.md`](./blind-spots.md).
 
 ## Semantics fixes validated in unit tests
 
-| Fix | Test |
-|---|---|
-| Redaction before disk | `tests/redaction-and-scope.test.ts` |
-| Turn-scoped untrusted context | same |
-| MCP trust (unknown ≠ alert) | same |
-| No `caused_by` for temporal context | same |
+Architecture-review + Phase 1.5b inconsistencies were fixed and covered by regressions. Docs updated only after:
+
+```sh
+npm ci && npm run build && npm test && npm run test:integration
+```
+
+all passed (including clean-checkout `npm ci`).
+
+| Fix | Behavior | Test |
+|---|---|---|
+| Persist redaction | `record()` stores/returns raw event; only `persist()` redacts a clone | `tests/phase15b-regression.test.ts`, architecture + redaction tests |
+| No sticky provenance | `candidateUntrustedForStep` only; no association when turn unknown; `latestUntrusted` removed | architecture regression |
+| MCP trust | trusted → allow; unknown → allow/log; untrusted → alert via `event.mcp.trust` | architecture regression + unit |
+| Shell sensitivity | No unconditional bash/pwsh sensitivity; semantics or explicit high only | `tests/phase15b-regression.test.ts` |
+| CI contract | `test:integration` + declared DSH deps; `npm ci` / build / test / integration | architecture regression + GHA |
+
+### Phase 1.5b shell + raw telemetry (observed)
+
+```text
+✔ phase1.5b: untrusted + git status => ALLOW
+✔ phase1.5b: untrusted + npm test => ALLOW
+✔ phase1.5b: untrusted + cat ~/.ssh/id_rsa => BLOCK
+✔ phase1.5b: untrusted + credential/exfil command => BLOCK
+✔ phase1.5b: policy inspects raw in-memory secrets; persist has none
+ℹ tests 15
+ℹ pass 15
+ℹ fail 0
+```
+
+Live integration (unchanged proofs):
+
+```text
+✔ LIVE: BLOCK / ALLOW / bypass / agent-loop
+ℹ pass 4  fail 0
+```
 
 ---
 
@@ -111,9 +140,10 @@ Documented in [`blind-spots.md`](./blind-spots.md).
 | ALLOW control | Yes |
 | Bypass documented | Yes |
 | Causal link honesty | Yes |
-| Context turn scoping | Yes |
-| MCP trust states | Yes |
-| Recorder redaction | Yes |
+| Context turn scoping (no sticky) | Yes |
+| MCP trust states (trusted/unknown/untrusted) | Yes |
+| Recorder: raw in-memory; redact on persist only | Yes |
+| Shell sensitivity by semantics (not tool name) | Yes |
 | CI (build + unit + integration) | Yes |
 
-**Phase 1 is COMPLETE.**
+**Phase 1 is COMPLETE** — validated by green unit + live integration tests, not by code presence alone.

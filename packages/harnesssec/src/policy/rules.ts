@@ -2,18 +2,23 @@ import type { PolicyRule } from './engine.js'
 import { extractShellCommand, looksSensitiveCommand } from '../events/helpers.js'
 import { isMcpToolName, parseMcpToolName } from '../events/schema.js'
 
-const SENSITIVE_TOOLS = new Set(['bash', 'pwsh', 'web_fetch'])
-
+/**
+ * Sensitive for untrusted-context correlation.
+ * There is no unconditional SENSITIVE_TOOLS set including bash/pwsh.
+ * For bash/pwsh: command semantics OR explicit tool.sensitivity === 'high'.
+ * For other tools: explicit high, or web_fetch (network egress).
+ */
 function toolIsSensitive(event: Parameters<PolicyRule['match']>[0]): boolean {
   const name = event.tool?.name ?? ''
+  if (name === 'bash' || name === 'pwsh') {
+    return event.tool?.sensitivity === 'high' || looksSensitiveCommand(event.action?.arguments)
+  }
   if (event.tool?.sensitivity === 'high') return true
-  if (SENSITIVE_TOOLS.has(name)) return true
-  if (isMcpToolName(name)) return true
-  if (name === 'bash' || name === 'pwsh') return looksSensitiveCommand(event.action?.arguments)
+  if (name === 'web_fetch') return true
   return false
 }
 
-/** Untrusted context → sensitive tool request. Harness-native causal rule. */
+/** Untrusted context → sensitive action (command semantics / explicit high). */
 export const untrustedContextSensitiveTool: PolicyRule = {
   id: 'untrusted-context-sensitive-tool',
   title: 'Untrusted Context → Sensitive Tool',
@@ -35,7 +40,7 @@ export const untrustedContextSensitiveTool: PolicyRule = {
   },
 }
 
-/** Credential-looking path in shell tool args — derived from command string, not OS file.read. */
+/** Credential-looking path in shell tool args. */
 export const credentialPathInShellArgs: PolicyRule = {
   id: 'credential-path-in-shell-args',
   title: 'Sensitive Credential Path in Shell Arguments',
@@ -53,16 +58,22 @@ export const credentialPathInShellArgs: PolicyRule = {
   },
 }
 
-/** MCP tool use — alert only when server trust is untrusted (not merely unknown). */
+/**
+ * MCP trust policy:
+ * - trusted  => allow (no match)
+ * - unknown  => allow/log (no match; allow path logs)
+ * - untrusted => alert
+ * Uses normalized event.mcp.trust only.
+ */
 export const untrustedMcpToolUse: PolicyRule = {
   id: 'untrusted-mcp-tool-use',
   title: 'Untrusted MCP Tool Invocation',
   severity: 'high',
   action: 'alert',
-  match(event, ctx) {
+  match(event) {
     if (event.event_type !== 'tool.requested') return false
     if (!isMcpToolName(event.tool?.name ?? '')) return false
-    return (event.mcp?.trust ?? ctx.mcpTrust) === 'untrusted'
+    return event.mcp?.trust === 'untrusted'
   },
   reason(event) {
     const parsed = parseMcpToolName(event.tool?.name ?? '')

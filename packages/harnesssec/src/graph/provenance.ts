@@ -91,22 +91,6 @@ export class ContextProvenance {
     return list.length ? list[list.length - 1] : undefined
   }
 
-  /** @deprecated sticky session lookup — do not use for policy. */
-  latestUntrusted(sessionId: string, agentId: string): string | undefined {
-    const prefix = `${sessionId}:${agentId}:`
-    let best: string | undefined
-    let bestTurn = -1
-    for (const [key, ids] of this.byTurn) {
-      if (!key.startsWith(prefix) || !ids.length) continue
-      const turn = Number(key.slice(prefix.length))
-      if (turn >= bestTurn) {
-        bestTurn = turn
-        best = ids[ids.length - 1]
-      }
-    }
-    return best
-  }
-
   get(contextId: string): ContextRecord | undefined {
     return this.byId.get(contextId)
   }

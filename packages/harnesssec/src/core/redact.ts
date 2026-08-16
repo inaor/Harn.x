@@ -1,14 +1,14 @@
-/** Redact secrets from events before disk persistence. */
+/** Redact secrets from a clone before disk persistence. Never mutate the input. */
 
-const SECRET_KEY = /^(?:.*(?:api[_-]?key|access[_-]?token|refresh[_-]?token|secret|password|passwd|authorization|auth[_-]?token|private[_-]?key|client[_-]?secret).*)$/i
-const SECRET_VALUE = /(?:sk-[a-zA-Z0-9]{16,}|ghp_[a-zA-Z0-9]{20,}|xox[baprs]-[a-zA-Z0-9-]{10,}|AKIA[0-9A-Z]{16}|-----BEGIN (?:RSA |OPENSSH |EC )?PRIVATE KEY-----)/
+const SECRET_KEY = /(?:api[_-]?key|access[_-]?token|refresh[_-]?token|secret|password|passwd|authorization|auth[_-]?token|private[_-]?key|client[_-]?secret|aws[_-]?secret|secret[_-]?access[_-]?key)/i
+
+const SECRET_VALUE = /(?:sk-[a-zA-Z0-9]{16,}|ghp_[a-zA-Z0-9]{20,}|github_pat_[a-zA-Z0-9_]{20,}|xox[baprs]-[a-zA-Z0-9-]{10,}|AKIA[0-9A-Z]{16}|ASIA[0-9A-Z]{16}|-----BEGIN (?:RSA |OPENSSH |EC |DSA )?PRIVATE KEY-----)/
 
 const REDACTED = '[REDACTED]'
 
 export function redactValue(value: unknown): unknown {
   if (typeof value === 'string') {
     if (SECRET_VALUE.test(value)) return REDACTED
-    // Long bearer-like tokens
     if (/^Bearer\s+\S{12,}/i.test(value)) return 'Bearer [REDACTED]'
     return value
   }
@@ -27,6 +27,10 @@ export function redactValue(value: unknown): unknown {
   return value
 }
 
-export function redactEvent<T extends Record<string, unknown>>(event: T): T {
-  return redactValue(event) as T
+/** Returns a redacted deep clone. Input is never mutated. */
+export function redactEvent<T>(event: T): T {
+  const clone = typeof structuredClone === 'function'
+    ? structuredClone(event)
+    : JSON.parse(JSON.stringify(event)) as T
+  return redactValue(clone) as T
 }

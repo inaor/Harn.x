@@ -51,39 +51,45 @@ export class FlightRecorder {
     }
   }
 
+  /**
+   * Persist a redacted clone only. Never mutate in-memory session/events.
+   * Redaction happens here — not in record() — so policy/detection see raw telemetry.
+   */
   private persist(sessionId: string): void {
     const session = this.sessions.get(sessionId)
     if (!session) return
+    // redactEvent deep-clones; session / events in memory are untouched.
     const safe = redactEvent(session as unknown as Record<string, unknown>)
     writeFileSync(join(this.storeDir, `${sessionId}.json`), JSON.stringify(safe, null, 2))
   }
 
+  /**
+   * Store and return the original/raw event for policy, detection, and correlation.
+   * Do not redact here. Disk writes go through persist() only.
+   */
   record(event: HarnessEvent): HarnessEvent {
-    // Redact before any in-memory enrichment is persisted; keep working copy redacted too.
-    const safeEvent = redactEvent(event as unknown as Record<string, unknown>) as unknown as HarnessEvent
-
-    let session = this.sessions.get(safeEvent.session.id)
+    let session = this.sessions.get(event.session.id)
     if (!session) {
       session = {
-        session_id: safeEvent.session.id,
-        started_at: safeEvent.timestamp,
+        session_id: event.session.id,
+        started_at: event.timestamp,
         events: [],
       }
-      this.sessions.set(safeEvent.session.id, session)
+      this.sessions.set(event.session.id, session)
     }
 
-    if (safeEvent.event_type === 'objective.captured' && safeEvent.objective) {
-      session.objective = safeEvent.objective
+    if (event.event_type === 'objective.captured' && event.objective) {
+      session.objective = event.objective
     }
-    if (safeEvent.event_type === 'session.ended') {
-      session.ended_at = safeEvent.timestamp
+    if (event.event_type === 'session.ended') {
+      session.ended_at = event.timestamp
     }
 
-    this.enrichLinks(safeEvent)
-    session.events.push(safeEvent)
-    this.indexEvent(safeEvent, true)
-    this.persist(safeEvent.session.id)
-    return safeEvent
+    this.enrichLinks(event)
+    session.events.push(event)
+    this.indexEvent(event, true)
+    this.persist(event.session.id)
+    return event
   }
 
   private enrichLinks(event: HarnessEvent): void {
@@ -96,17 +102,16 @@ export class FlightRecorder {
         : undefined)
 
     if (event.event_type === 'tool.requested' && agentId) {
+      // No association when turn is unknown — never sticky latestUntrusted().
       const candidate = this.provenance.candidateUntrustedForStep(event.session.id, agentId, turn)
       if (candidate) {
         links.candidate_context_source = candidate
         links.correlated_with = candidate
-        // Do NOT set caused_by or context_source from temporal co-occurrence.
       }
       const parent = this.lineage.parentOf(agentId)
       if (parent) links.parent_agent = parent
     }
 
-    // Defensible causality: deny/complete is the result of the prior request from this agent.
     if (event.event_type === 'tool.completed' || event.event_type === 'tool.denied') {
       if (agentId) {
         const prior = this.lastToolByAgent.get(agentId)
@@ -119,7 +124,6 @@ export class FlightRecorder {
       if (prior) links.policy_decision_for = prior
     }
 
-    // Aftermath is correlated with prior block; caused_by only if we have explicit policy id.
     if (event.event_type === 'policy.aftermath' && agentId) {
       const prior = this.lastPolicyByAgent.get(agentId)
       if (prior && !links.caused_by) {
