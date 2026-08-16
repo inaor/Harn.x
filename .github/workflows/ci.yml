@@ -18,6 +18,16 @@ jobs:
           node-version: '22'
           cache: npm
           cache-dependency-path: packages/harnesssec/package-lock.json
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+      - name: Clone OpenHands Software Agent SDK
+        working-directory: ${{ github.workspace }}
+        run: |
+          git clone --depth 1 https://github.com/OpenHands/software-agent-sdk.git openhands-sdk
+      - name: Sync OpenHands SDK (uv)
+        working-directory: ${{ github.workspace }}/openhands-sdk
+        run: uv sync --package openhands-sdk --package openhands-tools
       - run: npm ci
       - run: npm run build
       - run: npm test
@@ -27,5 +37,5 @@ jobs:
           node --import tsx --test tests/integration/*.test.ts 2>&1 | tee /tmp/harnx-integration.txt
           echo '### Integration test output' >> "$GITHUB_STEP_SUMMARY"
           echo '```' >> "$GITHUB_STEP_SUMMARY"
-          tail -40 /tmp/harnx-integration.txt >> "$GITHUB_STEP_SUMMARY"
+          tail -50 /tmp/harnx-integration.txt >> "$GITHUB_STEP_SUMMARY"
           echo '```' >> "$GITHUB_STEP_SUMMARY"

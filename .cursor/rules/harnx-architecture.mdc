@@ -1,0 +1,41 @@
+---
+description: Harn.x architecture contract — north star, layers, invariants, phase gates
+alwaysApply: true
+---
+
+# Harn.x Architecture Contract
+
+Harn.x is an open detection/response layer for **harness-native** autonomous agent behavior — not EDR, eBPF, MCP gateway, network proxy, IAM, CNAPP, or AI firewall.
+
+Hypothesis to strengthen or falsify:
+
+> Security-relevant information exists inside agent harnesses that OS/network/identity/cloud layers cannot reliably reconstruct after execution.
+
+## Layers
+
+Adapters → Normalized event model → Behavior graph → Detection/policy → Response/export.
+
+Vendor logic stays in `packages/harnesssec/src/adapters/<vendor>/`. Core stays vendor-neutral.
+
+## Prefer harness-native primitives
+
+intent, pre-exec deny, context trust/provenance, lineage, delegation, capability, MCP trust, policy reaction — not generic process/file/socket telemetry as primary features.
+
+## Invariants
+
+1. Never persist raw secrets; redact on persist only.
+2. Policy may see raw in-memory events.
+3. No unsupported `caused_by`.
+4. No vendor types in core.
+5. BLOCK claims need side-effect-absent proof + ALLOW control.
+6. Document bypasses per adapter.
+7. Never claim full coverage without proof.
+8. Sensor failure must not silently fail-open Harn.x policy paths we control.
+9. Prior adapters must keep passing.
+10. Docs match code.
+
+## Phase discipline
+
+- Phase 2 (OpenHands) must PASS before Phase 3 behavioral language.
+- Do not start Harness #3 or detection DSL until Phase 2 review allows it.
+- Verdict vocabulary: PASS / FAIL / PARTIAL — optimize for truth.

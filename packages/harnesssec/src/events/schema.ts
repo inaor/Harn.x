@@ -52,7 +52,8 @@ export interface HarnessEvent {
   timestamp: string
   event_type: EventType
   harness: {
-    name: 'deepseek-dsh'
+    /** Which agent harness produced this event. Adapter-set; core stays harness-agnostic. */
+    name: 'deepseek-dsh' | 'openhands'
     version?: string
   }
   session: {

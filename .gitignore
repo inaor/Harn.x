@@ -1,5 +1,8 @@
-# Upstream research checkout. Do not vendor the full tree.
-deepseek-harness/
+# Upstream research checkouts. Do not vendor the full trees.
+# Use root-anchored patterns so adapter packages are NOT ignored.
+/deepseek-harness/
+/openhands-sdk/
+/openhands/
 
 node_modules/
 dist/

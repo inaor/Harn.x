@@ -7,7 +7,10 @@ import { runAttackDemo } from '../demo/attack-demo.js'
 import { renderReplay } from './replay.js'
 
 function storeDir(flag?: string): string {
-  return flag ?? join(homedir(), '.harnesssec', 'sessions')
+  return flag
+    ?? process.env.HARNX_STORE
+    ?? process.env.HARNESSSEC_STORE
+    ?? join(homedir(), '.harnesssec', 'sessions')
 }
 
 /** Strip `--store <dir>` (and other flags later) so `cmd` is the real subcommand. */
@@ -42,6 +45,18 @@ async function main(): Promise<void> {
     const target = rest[0] ?? 'dsh'
     console.log(`HarnessSec attach target: ${target}`)
     console.log('')
+    if (target === 'openhands' || target === 'oh') {
+      console.log('OpenHands install (no fork) — PreToolUse hook:')
+      console.log('  Configure HookConfig / .openhands/hooks.json to run:')
+      console.log('    HARNX_STORE=<dir> node <path>/dist/adapters/openhands/hook-cli.js')
+      console.log('  or:  harnesssec openhands-hook   (stdin = HookEvent JSON)')
+      console.log('')
+      console.log('Seed untrusted context for demos:')
+      console.log('  harnesssec openhands-seed --session <id> --store <dir>')
+      console.log('')
+      console.log(`Flight records write to: ${dir}`)
+      return
+    }
     console.log('DeepSeek Harness install (no fork):')
     console.log('  dsh plugin --profile web add <path-to-packages/harnesssec>')
     console.log('')
@@ -50,6 +65,50 @@ async function main(): Promise<void> {
     console.log('')
     console.log(`Flight records write to: ${dir}`)
     console.log('Then use: harnesssec sessions | replay <id> | graph <id>')
+    return
+  }
+
+  if (cmd === 'openhands-hook') {
+    const { handleOpenHandsHook } = await import('../adapters/openhands/index.js')
+    const chunks: Buffer[] = []
+    for await (const chunk of process.stdin) chunks.push(chunk as Buffer)
+    const raw = Buffer.concat(chunks).toString('utf8')
+    let event: import('../adapters/openhands/index.js').OpenHandsHookEvent
+    try {
+      event = JSON.parse(raw)
+    } catch (err) {
+      console.error(`invalid HookEvent JSON: ${err}`)
+      process.stdout.write(`${JSON.stringify({
+        decision: 'deny',
+        reason: 'Harn.x hook received invalid HookEvent JSON',
+      })}\n`)
+      process.exit(2)
+    }
+    try {
+      const result = handleOpenHandsHook(event, dir)
+      process.stdout.write(`${JSON.stringify({
+        decision: result.decision,
+        ...result.reason ? { reason: result.reason } : {},
+      })}\n`)
+      process.exit(result.exitCode)
+    } catch (err) {
+      console.error(err)
+      process.stdout.write(`${JSON.stringify({
+        decision: 'deny',
+        reason: `Harn.x hook internal error: ${err instanceof Error ? err.message : String(err)}`,
+      })}\n`)
+      process.exit(2)
+    }
+  }
+
+  if (cmd === 'openhands-seed') {
+    const { seedUntrustedContext } = await import('../adapters/openhands/index.js')
+    let sessionId = 'openhands-live'
+    for (let i = 0; i < rest.length; i++) {
+      if (rest[i] === '--session') sessionId = rest[++i] ?? sessionId
+    }
+    const ev = seedUntrustedContext(dir, sessionId)
+    console.log(`seeded untrusted context session=${sessionId} event=${ev.id} turn=${ev.turn}`)
     return
   }
 
@@ -149,8 +208,10 @@ function printHelp(): void {
   console.log(`harnesssec — harness-native flight recorder
 
 Commands:
-  attach dsh              Show how to install the DeepSeek adapter
+  attach dsh|openhands    Show how to install an adapter
   demo                    Run the Phase 1 attack-demo scenario
+  openhands-hook          OpenHands PreToolUse stdin hook (exit 2 = deny)
+  openhands-seed          Seed untrusted context for an OpenHands session
   sessions                List recorded sessions
   inspect <session>       Inspect a session
   replay <session>        Forensic replay of a session

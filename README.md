@@ -191,8 +191,9 @@ Live attach is the next integration step; the demo above proves the recorder, gr
 |---|---|
 | 0 — DeepSeek choke-point map | Complete — [`docs/deepseek-harness-architecture.md`](docs/deepseek-harness-architecture.md) |
 | 1 — Harness flight recorder + **live DSH validation** | **COMPLETE** — [`docs/phase1-live-validation.md`](docs/phase1-live-validation.md) |
+| 2 — OpenHands portability | **PASS** — [`docs/phase2-findings.md`](docs/phase2-findings.md) |
 
-Blind spots: [`docs/blind-spots.md`](docs/blind-spots.md)
+Blind spots: [`docs/blind-spots.md`](docs/blind-spots.md) · OpenHands: [`docs/openhands-blind-spots.md`](docs/openhands-blind-spots.md)
 
 ### Live proof (integration)
 
@@ -204,7 +205,13 @@ npm test
 npm run test:integration
 ```
 
-Expected: BLOCK leaves `/tmp/harnx-proof` absent; ALLOW creates `/tmp/harnx-allow-ok`; `ctx.shell` bypass is invisible to Harn.x.
+Expected:
+
+- DeepSeek: BLOCK leaves `/tmp/harnx-proof` absent; ALLOW creates `/tmp/harnx-allow-ok`
+- OpenHands: BLOCK leaves `/tmp/harnx-openhands-proof` absent; ALLOW creates `/tmp/harnx-openhands-allowed`
+- Documented bypasses: DeepSeek `ctx.shell` · OpenHands `execute_tool`
+
+OpenHands live tests need a local `openhands-sdk/` checkout (CI clones it) and `uv`.
 
 ## Docs
 
@@ -215,3 +222,7 @@ Expected: BLOCK leaves `/tmp/harnx-proof` absent; ALLOW creates `/tmp/harnx-allo
 - [`docs/phase1-live-validation.md`](docs/phase1-live-validation.md)
 - [`docs/blind-spots.md`](docs/blind-spots.md)
 - [`docs/phase1-findings.md`](docs/phase1-findings.md)
+- [`docs/openhands-architecture.md`](docs/openhands-architecture.md)
+- [`docs/openhands-blind-spots.md`](docs/openhands-blind-spots.md)
+- [`docs/harness-comparison.md`](docs/harness-comparison.md)
+- [`docs/phase2-findings.md`](docs/phase2-findings.md)

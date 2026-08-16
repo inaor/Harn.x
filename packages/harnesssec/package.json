@@ -9,13 +9,15 @@
   },
   "exports": {
     ".": "./dist/index.js",
-    "./adapters/deepseek": "./dist/adapters/deepseek/index.js"
+    "./adapters/deepseek": "./dist/adapters/deepseek/index.js",
+    "./adapters/openhands": "./dist/adapters/openhands/index.js"
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "demo": "node --import tsx src/cli/main.ts demo",
     "test": "node --import tsx --test tests/*.test.ts",
     "test:integration": "node --import tsx --test tests/integration/*.test.ts",
+    "test:integration:openhands": "node --import tsx --test tests/integration/openhands-live.test.ts",
     "test:all": "npm run test && npm run test:integration",
     "cli": "node --import tsx src/cli/main.ts"
   },
