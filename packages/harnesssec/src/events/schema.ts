@@ -13,6 +13,7 @@ export type HarnessName = string
 /** Convenience constants — not an exhaustive enum. */
 export const HARNESS_DEEPSEEK_DSH: HarnessName = 'deepseek-dsh'
 export const HARNESS_OPENHANDS: HarnessName = 'openhands'
+export const HARNESS_CURSOR: HarnessName = 'cursor'
 
 export type EventType =
   | 'session.started'

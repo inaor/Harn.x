@@ -5,16 +5,17 @@ import { join } from 'node:path'
 import { test } from 'node:test'
 import { createHarnessSec } from '../src/index.ts'
 import { baseEvent } from '../src/events/helpers.ts'
-import { HARNESS_DEEPSEEK_DSH, HARNESS_OPENHANDS } from '../src/events/schema.ts'
+import { HARNESS_DEEPSEEK_DSH, HARNESS_OPENHANDS, HARNESS_CURSOR } from '../src/events/schema.ts'
 import {
   handleOpenHandsHook,
   mapOpenHandsToolName,
 } from '../src/adapters/openhands/index.ts'
+import { handleCursorHook } from '../src/adapters/cursor/index.ts'
 
 /**
  * Phase 2.1 regression: same defaultRules block equivalent intent on both harness brands.
  */
-test('portability regression: same policy blocks DSH bash and OpenHands terminal', () => {
+test('portability regression: same policy blocks DSH bash, OpenHands terminal, and Cursor shell', () => {
   const dir = mkdtempSync(join(tmpdir(), 'harnx-port-'))
   try {
     // --- DeepSeek-shaped events ---
@@ -78,6 +79,21 @@ test('portability regression: same policy blocks DSH bash and OpenHands terminal
       && e.policy?.rule === 'untrusted-context-sensitive-tool',
     ))
     assert.ok(pre.events.every(e => e.harness.name === HARNESS_OPENHANDS))
+
+    // --- Cursor beforeShellExecution (credential path; no API keys) ---
+    const curStore = join(dir, 'cursor')
+    const cur = handleCursorHook({
+      hook_event_name: 'beforeShellExecution',
+      conversation_id: 'cur-s',
+      command: 'cat ~/.ssh/id_rsa',
+    }, curStore)
+    assert.equal(cur.blocked, true)
+    assert.equal(cur.response.permission, 'deny')
+    assert.ok(cur.events.some(e =>
+      e.event_type === 'policy.decision'
+      && e.policy?.rule === 'credential-path-in-shell-args',
+    ))
+    assert.ok(cur.events.every(e => e.harness.name === HARNESS_CURSOR))
 
     // Extensibility: arbitrary harness name does not require core schema edit
     const custom = 'future-harness-x'

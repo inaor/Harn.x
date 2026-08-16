@@ -10,7 +10,8 @@
   "exports": {
     ".": "./dist/index.js",
     "./adapters/deepseek": "./dist/adapters/deepseek/index.js",
-    "./adapters/openhands": "./dist/adapters/openhands/index.js"
+    "./adapters/openhands": "./dist/adapters/openhands/index.js",
+    "./adapters/cursor": "./dist/adapters/cursor/index.js"
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",

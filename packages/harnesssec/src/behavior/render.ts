@@ -12,6 +12,7 @@ export interface IncidentSessionView {
       action?: { arguments?: Record<string, unknown>; target?: string }
       policy?: { decision?: string; rule?: string }
       detection?: { kind?: string; title?: string }
+      links?: { attempted_after?: string; correlated_with?: string }
     }>
   } | undefined
 }

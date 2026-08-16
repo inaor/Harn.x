@@ -1,0 +1,68 @@
+{
+  "version": 1,
+  "hooks": {
+    "sessionStart": [
+      {
+        "command": ".cursor/hooks/harnx-cursor.sh"
+      }
+    ],
+    "sessionEnd": [
+      {
+        "command": ".cursor/hooks/harnx-cursor.sh"
+      }
+    ],
+    "beforeSubmitPrompt": [
+      {
+        "command": ".cursor/hooks/harnx-cursor.sh"
+      }
+    ],
+    "beforeShellExecution": [
+      {
+        "command": ".cursor/hooks/harnx-cursor.sh",
+        "failClosed": true
+      }
+    ],
+    "afterShellExecution": [
+      {
+        "command": ".cursor/hooks/harnx-cursor.sh"
+      }
+    ],
+    "beforeReadFile": [
+      {
+        "command": ".cursor/hooks/harnx-cursor.sh",
+        "failClosed": true
+      }
+    ],
+    "beforeMCPExecution": [
+      {
+        "command": ".cursor/hooks/harnx-cursor.sh",
+        "failClosed": true
+      }
+    ],
+    "preToolUse": [
+      {
+        "command": ".cursor/hooks/harnx-cursor.sh"
+      }
+    ],
+    "postToolUse": [
+      {
+        "command": ".cursor/hooks/harnx-cursor.sh"
+      }
+    ],
+    "subagentStart": [
+      {
+        "command": ".cursor/hooks/harnx-cursor.sh"
+      }
+    ],
+    "subagentStop": [
+      {
+        "command": ".cursor/hooks/harnx-cursor.sh"
+      }
+    ],
+    "stop": [
+      {
+        "command": ".cursor/hooks/harnx-cursor.sh"
+      }
+    ]
+  }
+}

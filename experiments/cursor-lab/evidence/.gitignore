@@ -1,0 +1,3 @@
+# Cursor lab evidence store (runtime). Do not commit session JSON.
+*
+!.gitignore
