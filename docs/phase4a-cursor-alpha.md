@@ -123,12 +123,12 @@ Behavior       ON
 
 Protection:
 Shell          ✓   # beforeShellExecution deny path implemented
-Files          ✓   # path-scoped READ_SENSITIVE_FILE (Read/Grep/simple cat) via sensitive-resource-read
+Files          PARTIAL   # path-scoped READ_SENSITIVE_FILE enforced; broad output-control open
 MCP            PARTIAL
 Lineage        PARTIAL / unavailable
 ```
 
-No fake greens — values must match `cursor-coverage.md`. Broad tool-result filtering is **not** claimed.
+No fake greens — values must match `cursor-coverage.md`. Broad tool-result filtering is **not** claimed. Path-scoped sensitive Read/Grep is production-enforced; that does not equal full “Files ✓”.
 
 ## Local installation (supported)
 
