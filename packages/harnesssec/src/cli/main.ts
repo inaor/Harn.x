@@ -345,7 +345,7 @@ async function main(): Promise<void> {
     console.log('Protection:')
     if (harness === 'cursor' || harness === 'all') {
       console.log('Shell          ✓   (beforeShellExecution deny; failClosed required in hooks.json)')
-      console.log('Files          PARTIAL   (beforeReadFile; no full content persist; policy rarely blocks Read alone)')
+      console.log('Files          PARTIAL   (beforeReadFile; no full content persist; sensitive-resource-read blocks READ_SENSITIVE_FILE)')
       console.log('MCP            PARTIAL')
       console.log('Lineage        PARTIAL / unavailable   (subagent observation-only; no agent UUID)')
     } else {
