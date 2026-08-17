@@ -67,15 +67,19 @@ export function capabilityFamily(toolName: string): string {
 function canonicalizePath(raw: string): string {
   let p = raw.trim().replace(/^['"]|['"]$/g, '')
   p = p.replace(/^~\//, '/home/user/')
+  p = p.replace(/\\/g, '/')
   p = p.replace(/\/+/g, '/')
+  // Strip a single leading ./ so relative reads compare stably.
+  p = p.replace(/^\.\//, '')
   return p.toLowerCase()
 }
 
 function extractPathArg(args: unknown): string | undefined {
   if (!args || typeof args !== 'object') return undefined
   const record = args as Record<string, unknown>
-  for (const key of ['path', 'file', 'filename', 'filepath']) {
-    if (typeof record[key] === 'string' && record[key]) return record[key]
+  // Vendor-neutral path field names (Cursor Read uses file_path; others use path).
+  for (const key of ['path', 'file', 'filename', 'filepath', 'file_path']) {
+    if (typeof record[key] === 'string' && record[key]) return record[key] as string
   }
   return undefined
 }

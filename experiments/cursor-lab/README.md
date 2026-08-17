@@ -10,7 +10,8 @@ Never run the canonical proof inside the Harn.x source repository.
 - Canonical enforcement fixture is **inside** the workspace: `project/protected/build-info.txt`
   - Benign controlled resource (not a credential / SSH / API-key / token scenario)
   - Lab `env.sh` sets `HARNX_LAB_POLICY=phase4a`; **only** `cursor-hook` reads it and
-    explicitly injects experimental lab rules into PolicyEngine
+    explicitly injects experimental **resource-centric** lab rules into PolicyEngine
+    (normalized READ_FILE of `protected/build-info.txt` — Shell or Read)
   - Does not change DeepSeek / OpenHands / native Cursor defaultRules
 - SSH / credential fixtures under `test-home/` and `fake-home/` remain for a **separate** scenario where `MODEL_SELF_REJECTED` is a valid outcome
 - Never point tests at real `~/.ssh`, `~/.aws`, or production tokens

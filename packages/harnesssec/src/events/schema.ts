@@ -151,6 +151,14 @@ export interface HarnessEvent {
   raw?: {
     source_hook: string
     notes?: string
+    /** DERIVED policy evaluation snapshot (category/target from ActionNormalizer). */
+    normalized?: {
+      category: string
+      target: string
+      level: string
+      capability: string
+      tool_name: string
+    }
   }
 }
 
