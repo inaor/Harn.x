@@ -94,6 +94,8 @@ export function capabilityFamily(toolName: string): string {
   if (n === 'read' || n === 'write' || n === 'edit' || n.includes('filesystem') || n === 'file_editor') {
     return 'filesystem'
   }
+  // Explicit content-search tools (path-scoped Grep/rg) — distinct from filesystem Read.
+  if (n === 'grep' || n === 'rg') return 'search'
   if (n === 'web_fetch' || n === 'web_search' || n.startsWith('browser')) return 'network'
   if (isMcpToolName(n)) {
     const parsed = parseMcpToolName(n)
@@ -101,6 +103,15 @@ export function capabilityFamily(toolName: string): string {
   }
   if (n.includes('cloud') || n.includes('aws') || n.includes('gcp') || n.includes('azure')) return 'cloud'
   return n || 'unknown'
+}
+
+/**
+ * Tools that return file body bytes when given an explicit path field.
+ * Glob / metadata listing is intentionally excluded.
+ */
+function isExplicitFileContentProbe(toolName: string): boolean {
+  const n = toolName.toLowerCase()
+  return n === 'grep' || n === 'rg'
 }
 
 function canonicalizePath(raw: string): string {
@@ -298,6 +309,21 @@ export function normalizeAction(event: Pick<HarnessEvent, 'tool' | 'action' | 'e
 
   if (capability === 'cloud') {
     return unknownResult(event, toolName, capability, 'CLOUD_ACTION', (event.action?.target ?? '').toLowerCase())
+  }
+
+  // Explicit path-scoped content probe (Grep/rg) — same confidentiality effect as Read.
+  // Pattern and original tool remain in `original.arguments`. Broad/dir probes without a
+  // sensitive taxonomy path stay READ_FILE (allow) or OTHER when no path is present.
+  if (pathArg && isExplicitFileContentProbe(toolName)) {
+    const target = canonicalizePath(pathArg)
+    return {
+      category: isSensitivePath(target) ? 'READ_SENSITIVE_FILE' : 'READ_FILE',
+      target,
+      capability,
+      tool_name: toolName,
+      level: 'exact',
+      original: orig,
+    }
   }
 
   if (event.event_type === 'capability.snapshot') {

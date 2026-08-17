@@ -571,13 +571,35 @@ export function handleCursorHook(
 
   if (name === 'preToolUse') {
     const cursorTool = String(event.tool_name ?? 'unknown')
-    // Shell is enforced on beforeShellExecution — avoid double-deny races; still record.
-    if (cursorTool === 'Shell' || cursorTool === 'shell') {
-      return allow(sessionId, recorded)
-    }
     const mapped = mapCursorToolName(cursorTool)
     const args = parseToolInput(event.tool_input)
     const sensitivity = classifyToolSensitivity(mapped, args)
+    // Shell enforcement is beforeShellExecution (failClosed). Still record this
+    // preToolUse so parallel batches are reconstructable; do not re-evaluate policy
+    // here (avoids double-deny / race with the shell gate).
+    if (cursorTool === 'Shell' || cursorTool === 'shell' || mapped === 'bash') {
+      const observed = recorder.record(baseEvent({
+        event_type: 'tool.requested',
+        harness: { name: HARNESS_NAME },
+        session: { id: sessionId },
+        turn: meta.turn,
+        agent: { id: meta.agentId },
+        tool: {
+          name: mapped,
+          call_id: event.tool_use_id ? String(event.tool_use_id) : undefined,
+          sensitivity,
+          provider: 'cursor',
+        },
+        action: { type: 'tool.request', target: mapped, arguments: args },
+        capability: { used: mapped },
+        raw: {
+          source_hook: 'cursor:preToolUse',
+          notes: `cursor_tool=${cursorTool}; telemetry_only; enforcement_hook=beforeShellExecution`,
+        },
+      }))
+      recorded.push(observed)
+      return allow(sessionId, recorded)
+    }
     const requested = recorder.record(baseEvent({
       event_type: 'tool.requested',
       harness: { name: HARNESS_NAME },

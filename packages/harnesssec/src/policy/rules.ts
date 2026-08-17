@@ -19,9 +19,10 @@ function toolIsSensitive(event: Parameters<PolicyRule['match']>[0]): boolean {
 }
 
 /**
- * Semantic sensitive-resource read (capability-independent).
+ * Semantic sensitive-resource content access (capability-independent).
  * Matches when ActionNormalizer yields READ_SENSITIVE_FILE at exact|strong.
- * Works for Cursor Read, shell `cat PATH`, and other adapters with explicit paths.
+ * Covers Read, path-scoped Grep/rg, simple shell `cat PATH`, and adapters with
+ * explicit path metadata. Does not cover ambiguous commands (e.g. bare git diff).
  */
 export const sensitiveResourceRead: PolicyRule = {
   id: 'sensitive-resource-read',

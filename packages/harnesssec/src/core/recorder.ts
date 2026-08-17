@@ -1,4 +1,13 @@
-import { mkdirSync, readFileSync, writeFileSync, readdirSync, existsSync } from 'node:fs'
+import {
+  mkdirSync,
+  readFileSync,
+  writeFileSync,
+  readdirSync,
+  existsSync,
+  openSync,
+  closeSync,
+  unlinkSync,
+} from 'node:fs'
 import { join } from 'node:path'
 import type { HarnessEvent } from '../events/schema.js'
 import { CausalGraph } from '../graph/causal.js'
@@ -56,15 +65,85 @@ export class FlightRecorder {
   }
 
   /**
-   * Persist a redacted clone only. Never mutate in-memory session/events.
-   * Redaction happens here — not in record() — so policy/detection see raw telemetry.
+   * Exclusive lock for session JSON — Cursor may fire parallel preToolUse processes
+   * against the same conversation_id; last-write-wins without merge loses events
+   * (Proof B2: Grep .env tool_use in transcript with no Harn.x tool.requested).
+   */
+  private withSessionLock(sessionId: string, fn: () => void): void {
+    const lockPath = join(this.storeDir, `${sessionId}.json.lock`)
+    const deadline = Date.now() + 5000
+    while (true) {
+      try {
+        const fd = openSync(lockPath, 'wx')
+        try {
+          fn()
+        } finally {
+          closeSync(fd)
+          try {
+            unlinkSync(lockPath)
+          } catch {
+            // lock file may already be gone
+          }
+        }
+        return
+      } catch (err) {
+        const code = (err as NodeJS.ErrnoException)?.code
+        if (code !== 'EEXIST' || Date.now() >= deadline) throw err
+        // Busy-wait briefly; parallel hook processes are short-lived.
+        const waitUntil = Date.now() + 15
+        while (Date.now() < waitUntil) {
+          /* spin */
+        }
+      }
+    }
+  }
+
+  /**
+   * Persist a redacted clone only. Never mutate in-memory session/events with
+   * redacted disk clones — policy/detection must keep seeing raw telemetry.
+   * Merges with on-disk events by id so concurrent hook processes do not drop
+   * sibling tool.requested rows (Proof B2 Grep telemetry gap).
    */
   private persist(sessionId: string): void {
     const session = this.sessions.get(sessionId)
     if (!session) return
-    // redactEvent deep-clones; session / events in memory are untouched.
-    const safe = redactEvent(session as unknown as Record<string, unknown>)
-    writeFileSync(join(this.storeDir, `${sessionId}.json`), JSON.stringify(safe, null, 2))
+    this.withSessionLock(sessionId, () => {
+      const path = join(this.storeDir, `${sessionId}.json`)
+      const byId = new Map<string, HarnessEvent>()
+      let diskStarted = session.started_at
+      let diskEnded = session.ended_at
+      let diskObjective = session.objective
+      if (existsSync(path)) {
+        try {
+          const disk = JSON.parse(readFileSync(path, 'utf8')) as SessionRecord
+          for (const e of disk.events ?? []) {
+            if (e?.id) byId.set(e.id, e)
+          }
+          if (disk.started_at && disk.started_at < diskStarted) diskStarted = disk.started_at
+          if (disk.ended_at) diskEnded = disk.ended_at
+          if (disk.objective && !diskObjective) diskObjective = disk.objective
+        } catch {
+          // corrupt disk — write memory view
+        }
+      }
+      // Memory wins on id collision (raw in-process events over prior redacted disk).
+      for (const e of session.events) {
+        if (e?.id) byId.set(e.id, e)
+      }
+      const mergedEvents = [...byId.values()].sort((a, b) => {
+        const t = String(a.timestamp).localeCompare(String(b.timestamp))
+        return t !== 0 ? t : String(a.id).localeCompare(String(b.id))
+      })
+      const toWrite: SessionRecord = {
+        session_id: session.session_id,
+        started_at: diskStarted,
+        ended_at: diskEnded,
+        objective: diskObjective,
+        events: mergedEvents,
+      }
+      const safe = redactEvent(toWrite as unknown as Record<string, unknown>)
+      writeFileSync(path, JSON.stringify(safe, null, 2))
+    })
   }
 
   /**

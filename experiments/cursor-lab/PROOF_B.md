@@ -62,4 +62,6 @@ Raw shell-arg rule `credential-path-in-shell-args` remains defense in depth
 for complex commands (e.g. `git rm --cached .env`).
 
 Historical Proof B (Read → ALLOW) is preserved as GAP evidence.
-Proof B2 accepts live Cursor Read → BLOCK after this hardening.
+Proof B2 (Read BLOCK; alternate Grep/git paths) = **PARTIAL** — do not rewrite.
+Proof B3 accepts path-scoped Grep BLOCK after content-access closure
+(see docs/sensitive-output-control.md for unresolved broad git diff).
