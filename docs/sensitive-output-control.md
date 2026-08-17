@@ -72,6 +72,8 @@ blocking generic `git diff` by default is unsafe theater:
 ## Related
 
 - Historical Proof B2 = **PARTIAL** (Read blocked; alternate content paths remained).
-- Follow-up acceptance (after Grep closure): Proof B3 — explicit Grep on
-  sensitive fixtures must BLOCK under production rules; broad `git diff`
-  remains documented unresolved until a safe pre-model boundary exists.
+- Proof B3 live = production sensitive-resource Read **PASS**; path-scoped Grep
+  live **NOT EXERCISED**; key.pem body absent; broad output control still
+  unresolved until a safe pre-model boundary exists.
+- Phase 4A scoped verdict: **PASS** with output-control explicitly out of scope
+  (see `phase4a-cursor-alpha.md`).
