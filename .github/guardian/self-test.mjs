@@ -3,6 +3,10 @@
  * Guardian self-tests:
  * 1) Docs claim open HarnessName + closed schema union → REQUEST_CHANGES|BLOCK
  * 2) Vendor branch in behavior/ → REQUEST_CHANGES|BLOCK
+ * 3) Phase 3.2 claim integrity fixtures
+ * 4) Phase 4B factual reaction docs/identifiers → PASS (no false EDR/enforcement)
+ * 5) Real enforcement completion claim without integration → REQUEST_CHANGES|BLOCK
+ * 6) Generic EDR/OS signatures as behavior.detection → REQUEST_CHANGES|BLOCK
  */
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
@@ -46,9 +50,25 @@ const phase32 = runFixture('phase32-claim-integrity.json', (r) =>
   r.findings.some((f) =>
     /Scripted\/injected post-block|Simulated lineage|benchmarks without|loosened to manufacture|overgeneralized/i.test(f.message)))
 
+// Phase 4B: factual reaction docs + blockedReq identifiers must PASS (not false EDR / enforcement).
+const phase4bAllowed = runFixture('phase4b-reaction-allowed.json', (r) =>
+  r.verdict === 'PASS'
+  && !r.findings.some((f) => /Enforcement\/completion claim|duplicate generic EDR/i.test(f.message)))
+
+// Real enforcement completion claim without integration tests → reject.
+const enforcementNeedsIt = runFixture('enforcement-claim-needs-integration.json', (r) =>
+  r.findings.some((f) => /Enforcement\/completion claim without integration test/i.test(f.message)))
+
+// Generic OS/EDR sequence framed as behavior.detection → reject.
+const edrReject = runFixture('behavior-edr-generic-reject.json', (r) =>
+  r.findings.some((f) => /duplicate generic EDR\/OS signatures/i.test(f.message)))
+
 console.log(JSON.stringify({
   ok: true,
   harness_name_mismatch: harness.verdict,
   phase3_vendor_behavior: vendor.verdict,
   phase32_claim_integrity: phase32.verdict,
+  phase4b_reaction_allowed: phase4bAllowed.verdict,
+  enforcement_claim_needs_integration: enforcementNeedsIt.verdict,
+  behavior_edr_generic_reject: edrReject.verdict,
 }, null, 2))

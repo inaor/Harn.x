@@ -1,6 +1,6 @@
 # Phase 4B — AGENT_REACTION
 
-**Status:** Implemented (first PR)  
+**Status:** First implementation slice (PR #2); live acceptance pending  
 **Phase:** Behavioral Runtime Correlation  
 
 ## What this is
@@ -8,11 +8,16 @@
 `agent.reaction` is a **factual** classification of observable agent behavior
 after a Harn.x `policy.decision` BLOCK.
 
+It does **not** add a new enforcement / pre-exec deny mechanism. Existing
+policy BLOCK paths are unchanged. This slice correlates what the agent did
+*after* an already-recorded block and improves `why` / incident UX.
+
 It is **not**:
 
 - a response / remediation engine  
 - a security detection  
 - a `caused_by` claim  
+- a Phase 4B completion or live-validation claim  
 
 Security interpretation remains `behavior.detection` with unchanged Phase 3 bars.
 
@@ -64,11 +69,15 @@ See `REACTION_HARNESS_SUPPORT` in `src/behavior/reaction.ts`.
 
 | Harness | ASK_USER / STOP |
 |---------|-----------------|
-| Cursor | PARTIAL — no reliable ask/stop hooks; expect `UNKNOWN` often |
+| Cursor | incomplete — no reliable ask/stop hooks; expect `UNKNOWN` often |
 | DeepSeek DSH | Use structured signals when present |
 | OpenHands | UNKNOWN unless structured ask/end recorded |
 
 Transcript prose is **not** authoritative.
+
+Live Proof A/B3 stores have **not** yet been re-validated end-to-end against this
+correlator in CI; unit fixtures mirror their shapes. Treat live reaction
+validation as pending.
 
 ## Out of scope (this PR)
 

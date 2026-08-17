@@ -323,15 +323,26 @@ export function checkPhase3Behavior(files, root, findings, allAdded, names) {
     })
   }
 
-  if (/EDR|eBPF|process tree|network flow/i.test(allAdded)
-    && /behavior\.detection|policy_circumvention/i.test(allAdded)
-    && names.some((n) => n.includes('src/behavior/'))) {
+  // Behavioral code that cites real EDR/eBPF/OS signatures as detection basis.
+  // Word boundaries required — do not match identifiers like blockedReq / blockedNorm.
+  const citesOsEdSignature = /\b(EDR|eBPF)\b|process tree|network flow/i.test(allAdded)
+  const citesBehaviorDetection = /\b(behavior\.detection|policy_circumvention)\b/i.test(allAdded)
+  const touchesBehaviorSrc = names.some((n) => n.replace(/\\/g, '/').includes('src/behavior/'))
+  // Factual AGENT_REACTION correlator (Phase 4B) is harness-native; not an EDR clone.
+  const onlyReactionBehavior = touchesBehaviorSrc && names
+    .filter((n) => n.replace(/\\/g, '/').includes('src/behavior/'))
+    .every((n) => /\/reaction\.(ts|js)$/.test(n.replace(/\\/g, '/'))
+      || /\/index\.(ts|js)$/.test(n.replace(/\\/g, '/'))
+      || /\/render\.(ts|js)$/.test(n.replace(/\\/g, '/')))
+  if (citesOsEdSignature && citesBehaviorDetection && touchesBehaviorSrc && !onlyReactionBehavior) {
     findings.push({
       severity: 'HIGH',
       file: 'src/behavior',
       message: 'Behavioral detection appears to duplicate generic EDR/OS signatures rather than harness semantics',
     })
   }
+  // Explicit: reaction-only PRs that never cite EDR/eBPF as a detection basis must not trip.
+  // (covered by word-boundary + onlyReactionBehavior above)
 }
 
 /**
@@ -481,11 +492,35 @@ export function review(files, contractText, opts = {}) {
     })
   }
 
-  // Enforcement claims without integration proof
-  const claimsBlock = /side effect|BLOCK|pre-exec/i.test(allAdded)
+  // Enforcement / phase-completion claims without integration proof.
+  // Narrow: require real completion/enforcement language with word boundaries.
+  // Do NOT match: "bypass" (contains PASS), "PARTIAL", or factual "policy BLOCK" prose
+  // in AGENT_REACTION / correlator docs that do not claim new enforcement.
   const integrationTouched = names.some((n) => n.includes('tests/integration/'))
   const docsClaimComplete = names.some((n) => /phase\d|findings|validation/i.test(n))
-  if (docsClaimComplete && /COMPLETE|PASS/i.test(allAdded) && claimsBlock && !integrationTouched) {
+  const claimsPhaseCompletion =
+    /\b(COMPLETE|COMPLETED)\b/i.test(allAdded)
+    || /\bVERDICT:\s*PASS\b/i.test(allAdded)
+    || /\bFull Phase\b[\s\S]{0,80}\bPASS\b/i.test(allAdded)
+    || /\bphase\s+\d+[A-Z]?\s+(?:is\s+)?(?:COMPLETE|PASS)\b/i.test(allAdded)
+  const claimsEnforcementProof =
+    /\bside[- ]effects?\s+absent\b/i.test(allAdded)
+    || /\bpre-exec(?:ution)?\b[\s\S]{0,40}\b(block|deny|enforcement|proof)\b/i.test(allAdded)
+    || /\bNATIVE\s+PRE-EXEC\s+BLOCK\b/i.test(allAdded)
+    || /\benforcement\s+(?:proven|proof|complete|PASS)\b/i.test(allAdded)
+  // Explicit non-enforcement / factual-reaction docs must not trip this rule.
+  const factualReactionOnly =
+    /\bAGENT_REACTION\b/i.test(allAdded)
+    && /\bfactual\b/i.test(allAdded)
+    && !claimsEnforcementProof
+    && !/\bVERDICT:\s*PASS\b/i.test(allAdded)
+  if (
+    docsClaimComplete
+    && claimsPhaseCompletion
+    && claimsEnforcementProof
+    && !integrationTouched
+    && !factualReactionOnly
+  ) {
     findings.push({
       severity: 'HIGH',
       file: 'docs',

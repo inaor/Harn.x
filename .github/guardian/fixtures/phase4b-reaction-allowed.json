@@ -1,0 +1,20 @@
+{
+  "expected_verdicts": ["PASS"],
+  "files": [
+    {
+      "filename": "docs/phase4b-agent-reaction.md",
+      "status": "added",
+      "patch": "@@\n+Status: First implementation slice (PR); live acceptance pending\n+\n+agent.reaction is a factual classification after a Harn.x policy.decision BLOCK.\n+It is not a response engine, not a security detection, and not a caused_by claim.\n+Security interpretation remains behavior.detection with unchanged bars.\n+\n+ALTERNATE_TOOL requires different capability family AND exact/strong equivalence.\n+Silence alone is never ASK_USER or STOP.\n+Cursor ASK_USER/STOP support is incomplete — expect UNKNOWN often.\n+Not a bypass claim; factual correlation only.\n"
+    },
+    {
+      "filename": "packages/harnesssec/src/behavior/reaction.ts",
+      "status": "modified",
+      "patch": "@@\n+export const DEFAULT_REACTION_WINDOW_MS = 120_000\n+const blockedReq = findBlockedToolRequest(events, block)\n+const blockedNorm = normalizeAction(blockedReq)\n+// policy-block → agent semantic reaction (harness-native)\n+if (isAlternateTool(blockedNorm, laterNorm)) return { type: 'ALTERNATE_TOOL' }\n+export function correlateAgentReaction() {}\n+behavior.detection remains separate from agent.reaction\n"
+    },
+    {
+      "filename": "packages/harnesssec/tests/phase4b-reaction.test.ts",
+      "status": "added",
+      "patch": "@@\n+test('ALTERNATE_TOOL Read then Grep') {}\n+assert.doesNotMatch(why, /possible policy bypass/)\n"
+    }
+  ]
+}

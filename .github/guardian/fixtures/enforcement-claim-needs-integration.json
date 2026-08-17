@@ -1,0 +1,15 @@
+{
+  "expected_verdicts": ["REQUEST_CHANGES", "BLOCK"],
+  "files": [
+    {
+      "filename": "docs/phase4a-cursor-alpha.md",
+      "status": "modified",
+      "patch": "@@\n+## Verdict: PASS\n+\n+VERDICT: PASS\n+Native pre-exec BLOCK proven with side effect absent.\n+Phase 4A is COMPLETE.\n+Enforcement proven via beforeShellExecution deny path.\n"
+    },
+    {
+      "filename": "packages/harnesssec/src/adapters/cursor/index.ts",
+      "status": "modified",
+      "patch": "@@\n+// adapter tweak without integration tests\n+export function handleCursorHook() {}\n"
+    }
+  ]
+}
