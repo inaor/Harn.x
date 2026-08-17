@@ -7,6 +7,7 @@
  * 4) Phase 4B factual reaction docs/identifiers → PASS (no false EDR/enforcement)
  * 5) Real enforcement completion claim without integration → REQUEST_CHANGES|BLOCK
  * 6) Generic EDR/OS signatures as behavior.detection → REQUEST_CHANGES|BLOCK
+ * 7) Guardian meta fixtures in same PR must not poison factual reaction product → PASS
  */
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
@@ -63,6 +64,11 @@ const enforcementNeedsIt = runFixture('enforcement-claim-needs-integration.json'
 const edrReject = runFixture('behavior-edr-generic-reject.json', (r) =>
   r.findings.some((f) => /duplicate generic EDR\/OS signatures/i.test(f.message)))
 
+// Guardian self-test/fixture patches in the same PR must not trip product claim heuristics.
+const metaNoPoison = runFixture('guardian-meta-does-not-poison.json', (r) =>
+  r.verdict === 'PASS'
+  && !r.findings.some((f) => /Enforcement\/completion claim|duplicate generic EDR/i.test(f.message)))
+
 console.log(JSON.stringify({
   ok: true,
   harness_name_mismatch: harness.verdict,
@@ -71,4 +77,5 @@ console.log(JSON.stringify({
   phase4b_reaction_allowed: phase4bAllowed.verdict,
   enforcement_claim_needs_integration: enforcementNeedsIt.verdict,
   behavior_edr_generic_reject: edrReject.verdict,
+  guardian_meta_does_not_poison: metaNoPoison.verdict,
 }, null, 2))
