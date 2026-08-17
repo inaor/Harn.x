@@ -16,6 +16,10 @@ import { CapabilityTracker } from '../graph/capabilities.js'
 import { TrustStore } from '../graph/trust.js'
 import { ContextProvenance } from '../graph/provenance.js'
 import { BehavioralEngine } from '../behavior/engine.js'
+import {
+  backfillSessionReactions,
+  shouldCorrelateAfter,
+} from '../behavior/reaction.js'
 import { McpTrustRegistry, DEFAULT_MCP_TRUST } from './mcp-trust.js'
 import { redactEvent } from './redact.js'
 
@@ -178,7 +182,29 @@ export class FlightRecorder {
       // record() will observe behavior.detection → engine returns [] (no recursion).
       this.record(det)
     }
+    // Phase 4B: factual AGENT_REACTION backfill (separate from behavior.detection).
+    if (event.event_type !== 'agent.reaction' && shouldCorrelateAfter(event)) {
+      const fresh = this.getSession(event.session.id)?.events ?? session.events
+      const reactions = backfillSessionReactions(fresh)
+      for (const rx of reactions) {
+        this.record(rx)
+      }
+    }
     return event
+  }
+
+  /**
+   * Replay helper: persist missing agent.reaction events for a session.
+   * Safe to call multiple times (idempotent per block id).
+   */
+  backfillReactions(sessionId: string): HarnessEvent[] {
+    const session = this.getSession(sessionId)
+    if (!session) return []
+    const created = backfillSessionReactions(session.events)
+    for (const rx of created) {
+      this.record(rx)
+    }
+    return created
   }
 
   private enrichLinks(event: HarnessEvent): void {

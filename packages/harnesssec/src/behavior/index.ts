@@ -31,5 +31,21 @@ export { BehavioralEngine } from './engine.js'
 export type { LineageNode } from './engine.js'
 export { buildDetectionEvent } from './emit.js'
 export { renderIncident } from './render.js'
-export { classifyPostBlockReaction } from './reaction.js'
-export type { PostBlockReaction, ReactionClassification } from './reaction.js'
+export {
+  DEFAULT_REACTION_WINDOW_MS,
+  correlateAgentReaction,
+  correlateAllSessionReactions,
+  buildReactionEvent,
+  backfillSessionReactions,
+  shouldCorrelateAfter,
+  REACTION_HARNESS_SUPPORT,
+  classifyPostBlockReaction,
+} from './reaction.js'
+export type {
+  AgentReactionType,
+  AgentReactionResult,
+  ReactionEvidenceTag,
+  CorrelateReactionOptions,
+  PostBlockReaction,
+  ReactionClassification,
+} from './reaction.js'

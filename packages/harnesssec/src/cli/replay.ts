@@ -86,12 +86,30 @@ export function renderReplay(recorder: FlightRecorder, sessionId: string): strin
     }
 
     if (e.event_type === 'policy.aftermath') {
-      lines.push('Agent reaction after block')
+      lines.push('Agent activity after block (legacy note)')
       lines.push('')
-      lines.push(`selected alternate tool:`)
+      lines.push(`tool:`)
       lines.push(e.tool?.name ?? '-')
       lines.push('')
-      lines.push('HarnessSec: possible policy bypass behavior (recorded)')
+      lines.push('Factual correlation only — not a bypass/security claim.')
+      lines.push('Prefer agent.reaction for Phase 4B classification.')
+      lines.push('')
+      lines.push('        ↓')
+      lines.push('')
+    }
+
+    if (e.event_type === 'agent.reaction' && e.reaction) {
+      lines.push('AGENT_REACTION (factual)')
+      lines.push('')
+      lines.push(`type:`)
+      lines.push(e.reaction.type)
+      lines.push('')
+      lines.push(`evidence:`)
+      lines.push(e.reaction.evidence)
+      lines.push('')
+      lines.push(e.reaction.summary)
+      lines.push('')
+      lines.push('Not behavior.detection — security meaning is separate.')
       lines.push('')
       lines.push('        ↓')
       lines.push('')
@@ -138,7 +156,8 @@ function label(t: string): string {
     case 'policy.decision': return 'Policy decision'
     case 'tool.denied': return 'Tool denied'
     case 'tool.completed': return 'Tool completed'
-    case 'policy.aftermath': return 'Post-block behavior'
+    case 'policy.aftermath': return 'Post-block note (legacy)'
+    case 'agent.reaction': return 'Agent reaction (factual)'
     case 'behavior.detection': return 'Behavioral detection'
     case 'agent.started': return 'Agent started'
     case 'session.started': return 'Session started'

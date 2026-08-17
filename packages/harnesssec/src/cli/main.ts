@@ -269,53 +269,8 @@ async function main(): Promise<void> {
       console.error('usage: harnesssec why <session-id|event-id>')
       process.exit(1)
     }
-    const sessions = recorder.listSessions()
-    const session = recorder.getSession(id)
-      ?? sessions.find(s => s.events.some(e => e.id === id))
-    if (!session) {
-      console.error(`session/event not found: ${id}`)
-      process.exit(1)
-    }
-    const denied = session.events.filter(e => e.event_type === 'tool.denied')
-    const decisions = session.events.filter(e =>
-      e.event_type === 'policy.decision' && e.policy?.decision === 'block',
-    )
-    const contexts = session.events.filter(e =>
-      e.event_type === 'context.introduced' && e.context?.trust === 'untrusted',
-    )
-    const focus = session.events.find(e => e.id === id)
-      ?? denied[denied.length - 1]
-      ?? decisions[decisions.length - 1]
-
-    console.log('HARN.X WHY')
-    console.log('')
-    console.log('Session:', session.session_id)
-    console.log('Harness:', focus?.harness?.name ?? session.events[0]?.harness?.name ?? '-')
-    console.log('')
-    console.log('Previous context:')
-    if (!contexts.length) console.log('(none recorded)')
-    for (const c of contexts.slice(-3)) {
-      console.log(`- ${c.context?.source_type}/${c.context?.source} trust=${c.context?.trust}`)
-      if (c.context?.excerpt) console.log(`  excerpt: ${c.context.excerpt.slice(0, 160)}`)
-    }
-    console.log('')
-    console.log('Requested action:')
-    console.log(focus?.action?.type ?? focus?.event_type ?? '-')
-    console.log('')
-    console.log('Target:')
-    console.log(focus?.action?.target ?? focus?.tool?.name ?? '-')
-    console.log('')
-    console.log('Policy evidence:')
-    for (const d of decisions.slice(-5)) {
-      console.log(`- ${d.policy?.rule}: ${d.policy?.reason}`)
-    }
-    if (!decisions.length) console.log('(no block decisions)')
-    console.log('')
-    console.log('Decision:')
-    console.log(focus?.policy?.decision?.toUpperCase()
-      ?? (denied.length ? 'BLOCK' : 'ALLOW/NONE'))
-    console.log('')
-    console.log('No LLM inference was used.')
+    const { renderWhy } = await import('./why.js')
+    console.log(renderWhy(recorder, id))
     return
   }
 
@@ -340,7 +295,7 @@ async function main(): Promise<void> {
     console.log('Connection    ', active ? 'ACTIVE' : 'INACTIVE')
     console.log('Policy        ', 'Default')
     console.log('Recording     ', 'ON')
-    console.log('Behavior      ', 'ON')
+    console.log('Behavior      ', 'ON (reaction correlation)')
     console.log('')
     console.log('Protection:')
     if (harness === 'cursor' || harness === 'all') {

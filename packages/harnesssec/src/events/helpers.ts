@@ -100,6 +100,7 @@ export function baseEvent(
     ...partial.capability ? { capability: partial.capability } : {},
     ...partial.policy ? { policy: partial.policy } : {},
     ...partial.detection ? { detection: partial.detection } : {},
+    ...partial.reaction ? { reaction: partial.reaction } : {},
     ...partial.links ? { links: partial.links } : {},
     ...partial.raw ? { raw: partial.raw } : {},
   }
@@ -129,6 +130,7 @@ const EVENT_TYPES: EventType[] = [
   'subagent.ended',
   'policy.decision',
   'policy.aftermath',
+  'agent.reaction',
   'behavior.detection',
   'approval.asked',
   'approval.decided',

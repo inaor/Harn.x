@@ -12,6 +12,7 @@ export interface IncidentSessionView {
       action?: { arguments?: Record<string, unknown>; target?: string }
       policy?: { decision?: string; rule?: string }
       detection?: { kind?: string; title?: string }
+      reaction?: { type?: string; evidence?: string; summary?: string }
       links?: { attempted_after?: string; correlated_with?: string }
     }>
   } | undefined
@@ -90,6 +91,24 @@ export function renderIncident(store: IncidentSessionView, sessionId: string): s
       lines.push(t)
       lines.push('[OBSERVED] BLOCKED')
       if (e.policy.rule) lines.push(`rule: ${e.policy.rule}`)
+      lines.push('')
+      continue
+    }
+
+    if (e.event_type === 'agent.reaction' && e.reaction) {
+      lines.push(t)
+      lines.push('[CORRELATED] AGENT_REACTION (factual — not a security detection)')
+      lines.push(`type: ${e.reaction.type}`)
+      lines.push(`evidence: ${e.reaction.evidence ?? '-'}`)
+      if (e.reaction.summary) lines.push(e.reaction.summary)
+      lines.push('')
+      continue
+    }
+
+    if (e.event_type === 'policy.aftermath') {
+      lines.push(t)
+      lines.push('[CORRELATED] Post-block tool note (legacy policy.aftermath)')
+      lines.push('Not a security detection — see agent.reaction when present')
       lines.push('')
       continue
     }
