@@ -1,6 +1,7 @@
 import type { HarnessEvent, PolicyDecisionKind } from '../events/schema.js'
 import { baseEvent } from '../events/helpers.js'
 import type { FlightRecorder } from '../core/recorder.js'
+import { normalizeAction, type NormalizedAction } from '../behavior/normalize.js'
 
 export interface PolicyRule {
   id: string
@@ -20,6 +21,8 @@ export interface PolicyContext {
   availableTools: string[]
   priorBlockEventId?: string
   mcpTrust?: 'trusted' | 'untrusted' | 'unknown'
+  /** Deterministic normalized action for resource-centric rules (vendor-neutral). */
+  normalized: NormalizedAction
 }
 
 export interface PolicyVerdict {
@@ -70,7 +73,17 @@ export class PolicyEngine {
             }
             : {},
         },
-        raw: { source_hook: 'harnesssec.policy' },
+        raw: {
+          source_hook: 'harnesssec.policy',
+          notes: `normalized=${ctx.normalized.category}:${ctx.normalized.target || '(empty)'};level=${ctx.normalized.level}`,
+          normalized: {
+            category: ctx.normalized.category,
+            target: ctx.normalized.target,
+            level: ctx.normalized.level,
+            capability: ctx.normalized.capability,
+            tool_name: ctx.normalized.tool_name,
+          },
+        },
       })
       this.recorder.record(decisionEvent)
       return { decision: rule.action, rule, reason, event: decisionEvent }
@@ -86,7 +99,17 @@ export class PolicyEngine {
       tool: event.tool,
       policy: { decision: 'allow', reason: 'no matching rule' },
       links: { policy_decision_for: event.id },
-      raw: { source_hook: 'harnesssec.policy' },
+      raw: {
+        source_hook: 'harnesssec.policy',
+        notes: `normalized=${ctx.normalized.category}:${ctx.normalized.target || '(empty)'};level=${ctx.normalized.level}`,
+        normalized: {
+          category: ctx.normalized.category,
+          target: ctx.normalized.target,
+          level: ctx.normalized.level,
+          capability: ctx.normalized.capability,
+          tool_name: ctx.normalized.tool_name,
+        },
+      },
     })
     this.recorder.record(allowEvent)
     return { decision: 'allow', reason: 'no matching rule', event: allowEvent }
@@ -170,6 +193,7 @@ export class PolicyEngine {
       availableTools,
       priorBlockEventId: priorBlock?.id,
       mcpTrust: event.mcp?.trust,
+      normalized: normalizeAction(event),
     }
   }
 }

@@ -18,6 +18,58 @@ function toolIsSensitive(event: Parameters<PolicyRule['match']>[0]): boolean {
   return false
 }
 
+/**
+ * Semantic sensitive-resource content access (capability-independent).
+ * Matches when ActionNormalizer yields READ_SENSITIVE_FILE at exact|strong.
+ * Covers Read, path-scoped Grep/rg, simple shell `cat PATH`, and adapters with
+ * explicit path metadata. Does not cover ambiguous commands (e.g. bare git diff).
+ */
+export const sensitiveResourceRead: PolicyRule = {
+  id: 'sensitive-resource-read',
+  title: 'Sensitive Resource Read',
+  severity: 'critical',
+  action: 'block',
+  match(event, ctx) {
+    if (event.event_type !== 'tool.requested') return false
+    const norm = ctx.normalized
+    if (norm.level !== 'exact' && norm.level !== 'strong') return false
+    return norm.category === 'READ_SENSITIVE_FILE'
+  },
+  reason(_event, ctx) {
+    const n = ctx.normalized
+    return [
+      'Sensitive resource read',
+      `category=${n.category}`,
+      `target=${n.target}`,
+      `tool=${n.tool_name}`,
+      `capability=${n.capability}`,
+      `level=${n.level}`,
+    ].join(' ')
+  },
+}
+
+/**
+ * Defense in depth: credential-looking tokens in raw shell arguments.
+ * Covers complex commands that do not normalize to READ_* (e.g. git rm --cached .env).
+ * Does not replace sensitive-resource-read for simple path reads.
+ */
+export const credentialPathInShellArgs: PolicyRule = {
+  id: 'credential-path-in-shell-args',
+  title: 'Sensitive Credential Path in Shell Arguments',
+  severity: 'critical',
+  action: 'block',
+  match(event) {
+    if (event.event_type !== 'tool.requested') return false
+    const name = event.tool?.name ?? ''
+    if (name !== 'bash' && name !== 'pwsh') return false
+    const cmd = extractShellCommand(event.action?.arguments) ?? ''
+    return /(?:~\/|\.\/)?\.?(?:ssh|aws)\/|id_rsa|id_ed25519|credentials|\.env(?:\.local)?|(?:^|[\s/"'`=])key\.pem\b/i.test(cmd)
+  },
+  reason(event) {
+    return `Shell tool arguments reference credential material: ${extractShellCommand(event.action?.arguments) ?? ''}`
+  },
+}
+
 /** Untrusted context → sensitive action (command semantics / explicit high). */
 export const untrustedContextSensitiveTool: PolicyRule = {
   id: 'untrusted-context-sensitive-tool',
@@ -37,24 +89,6 @@ export const untrustedContextSensitiveTool: PolicyRule = {
       event.tool?.name ? `tool=${event.tool.name}` : '',
       cmd ? `command=${cmd}` : '',
     ].filter(Boolean).join(' ')
-  },
-}
-
-/** Credential-looking path in shell tool args. */
-export const credentialPathInShellArgs: PolicyRule = {
-  id: 'credential-path-in-shell-args',
-  title: 'Sensitive Credential Path in Shell Arguments',
-  severity: 'critical',
-  action: 'block',
-  match(event) {
-    if (event.event_type !== 'tool.requested') return false
-    const name = event.tool?.name ?? ''
-    if (name !== 'bash' && name !== 'pwsh') return false
-    const cmd = extractShellCommand(event.action?.arguments) ?? ''
-    return /(?:~\/|\.\/)?\.?(?:ssh|aws)\/|id_rsa|id_ed25519|credentials|\.env(?:\.local)?/i.test(cmd)
-  },
-  reason(event) {
-    return `Shell tool arguments reference credential material: ${extractShellCommand(event.action?.arguments) ?? ''}`
   },
 }
 
@@ -81,7 +115,9 @@ export const untrustedMcpToolUse: PolicyRule = {
   },
 }
 
+/** Production / native default policy set. Lab rules are never included here. */
 export const defaultRules: PolicyRule[] = [
+  sensitiveResourceRead,
   credentialPathInShellArgs,
   untrustedContextSensitiveTool,
   untrustedMcpToolUse,

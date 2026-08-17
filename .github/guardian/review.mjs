@@ -91,6 +91,113 @@ function isTestPath(name) {
  * @param {string} allAdded
  * @param {string[]} names
  */
+/**
+ * Phase 4A Cursor adapter / claim checks.
+ * @param {PrFile[]} files
+ * @param {Finding[]} findings
+ * @param {string} allAdded
+ * @param {string[]} names
+ */
+export function checkPhase4ACursor(files, findings, allAdded, names) {
+  const cursorAdapter = names.some((n) => n.includes('adapters/cursor/'))
+  if (!cursorAdapter) return
+
+  const hasArch = names.some((n) => /docs\/cursor-architecture\.md/.test(n))
+    || existsSync(join(ROOT, 'docs/cursor-architecture.md'))
+  const hasCoverage = names.some((n) => /docs\/cursor-coverage\.md/.test(n))
+    || existsSync(join(ROOT, 'docs/cursor-coverage.md'))
+  const hasBlind = names.some((n) => /docs\/cursor-blind-spots\.md/.test(n))
+    || existsSync(join(ROOT, 'docs/cursor-blind-spots.md'))
+  const hasPhase = names.some((n) => /docs\/phase4a-cursor-alpha\.md/.test(n))
+    || existsSync(join(ROOT, 'docs/phase4a-cursor-alpha.md'))
+
+  if (!hasArch || !hasCoverage || !hasBlind || !hasPhase) {
+    findings.push({
+      severity: 'BLOCKER',
+      file: 'docs',
+      message: 'Cursor adapter requires docs/cursor-architecture.md, cursor-coverage.md, cursor-blind-spots.md, phase4a-cursor-alpha.md',
+    })
+  }
+
+  // Cursor-specific logic leaking into core/behavior/policy
+  for (const f of files) {
+    if (!isCorePath(f.filename) || isTestPath(f.filename)) continue
+    const added = addedLines(f.patch)
+    if (/harness\s*===\s*['"]cursor['"]|if\s*\(.*cursor.*\).*behavior/i.test(added)) {
+      findings.push({
+        severity: 'BLOCKER',
+        file: f.filename,
+        message: 'Cursor-specific branching in core — keep vendor logic in adapters/cursor/',
+      })
+    }
+  }
+
+  if (/OPENAI_API_KEY|DEEPSEEK_API_KEY|HARNX_TEST_API_KEY/.test(allAdded)
+    && names.some((n) => n.includes('adapters/cursor/'))) {
+    const cursorSrc = files.filter((f) => f.filename.includes('adapters/cursor/') && /\.(ts|js)$/.test(f.filename))
+    for (const f of cursorSrc) {
+      const added = addedLines(f.patch)
+      if (/OPENAI_API_KEY|DEEPSEEK_API_KEY|HARNX_TEST_API_KEY/.test(added)) {
+        findings.push({
+          severity: 'BLOCKER',
+          file: f.filename,
+          message: 'Cursor native adapter must not reference model-provider API key env vars',
+        })
+      }
+    }
+  }
+
+  if (/permission\s*:\s*['"]ask['"]/.test(allAdded)
+    && /canonical|Required Proof|beforeShellExecution/i.test(allAdded)
+    && names.some((n) => /cursor|phase4a/i.test(n))) {
+    findings.push({
+      severity: 'HIGH',
+      file: 'docs',
+      message: 'Canonical Cursor proof must use permission:deny — not ask',
+    })
+  }
+
+  if (/subagentStart[\s\S]{0,200}permission['"]?\s*:\s*['"]deny['"]/i.test(allAdded)
+    && /reliable|proven|PASS/i.test(allAdded)
+    && !/observation-only|side-effect/i.test(allAdded)) {
+    findings.push({
+      severity: 'HIGH',
+      file: 'adapters/cursor',
+      message: 'Do not claim reliable subagent blocking without side-effect/runtime evidence',
+    })
+  }
+
+  if (/content_persisted\s*=\s*true|action\.arguments\.content\s*=/.test(allAdded)
+    && names.some((n) => n.includes('adapters/cursor/'))) {
+    findings.push({
+      severity: 'HIGH',
+      file: 'adapters/cursor',
+      message: 'Avoid persisting full beforeReadFile content by default',
+    })
+  }
+
+  if (/~\/\.ssh\/id_rsa|~\/\.aws\/credentials/.test(allAdded)
+    && names.some((n) => /fixtures|cursor-lab|tests\//.test(n))
+    && !/HARNX_FAKE|fake-home|FAKE_PRIVATE_KEY/.test(allAdded)) {
+    findings.push({
+      severity: 'BLOCKER',
+      file: 'tests',
+      message: 'Tests/fixtures must not target real workstation credential paths',
+    })
+  }
+
+  if (/BehaviorEngine|normalizeAction|defaultRules/.test(allAdded)
+    && names.some((n) => n.includes('src/behavior/') || n.includes('src/policy/rules'))
+    && names.some((n) => n.includes('adapters/cursor/'))
+    && /cursor/i.test(allAdded)) {
+    findings.push({
+      severity: 'HIGH',
+      file: 'core',
+      message: 'Detector/policy changes paired with Cursor adapter — justify or revert (no Cursor-only tuning)',
+    })
+  }
+}
+
 export function checkPhase32ExperimentClaims(files, findings, allAdded, names) {
   const touchesPhase32Docs = names.some((n) => /phase3\.2|live-autonomy/i.test(n))
   const touchesExperiment = names.some((n) => n.includes('experiments/live-autonomy/'))
@@ -407,7 +514,7 @@ export function review(files, contractText, opts = {}) {
     }
   }
 
-  // Premature YAML DSL / Harness #3 (Phase 3 behavioral code is allowed)
+  // Premature YAML DSL (Phase 3 behavioral code is allowed)
   if (/detection\s+language|behavioral\s+YAML|rule:\s*\n\s+sequence:/i.test(allAdded)
     && names.some((n) => n.includes('src/') && !n.includes('docs/'))) {
     findings.push({
@@ -416,16 +523,19 @@ export function review(files, contractText, opts = {}) {
       message: 'YAML/DSL detection language is out of scope — use programmatic behavior/ API only',
     })
   }
-  if (/adapters\/(?!deepseek|openhands)[^/]+\//i.test(names.join('\n'))
-    || /Harness\s*#\s*3|third harness adapter/i.test(allAdded) && names.some((n) => /adapters\//.test(n))) {
-    if (!/docs\//.test(names.join(' '))) {
-      findings.push({
-        severity: 'BLOCKER',
-        file: 'adapters',
-        message: 'Harness #3 / new adapter before Phase 4 gate',
-      })
-    }
+
+  // New adapters: deepseek + openhands + cursor (Phase 4A) allowed; others need docs + gate
+  const newAdapter = names.join('\n').match(/adapters\/(?!deepseek|openhands|cursor)[^/\s]+/g)
+  if (newAdapter) {
+    findings.push({
+      severity: 'BLOCKER',
+      file: 'adapters',
+      message: `Unexpected adapter path(s) before Phase gate: ${[...new Set(newAdapter)].join(', ')}`,
+    })
   }
+
+  // Phase 4A Cursor adapter requirements
+  checkPhase4ACursor(files, findings, allAdded, names)
 
   // Phase 3 behavioral quality checks
   checkPhase3Behavior(files, root, findings, allAdded, names)

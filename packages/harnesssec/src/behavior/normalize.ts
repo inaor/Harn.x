@@ -43,10 +43,49 @@ export interface NormalizedAction {
   original: OriginalActionEvidence
 }
 
-const SENSITIVE_PATH = /(?:~\/|\.?\/)?(?:\.ssh\/|\.aws\/)|(?:^|[\s"'`=])(?:id_rsa|id_ed25519|credentials|\.env(?:\.local)?|\/etc\/shadow)/i
-/** Only simple single-path read utilities — not arbitrary shell. */
 const PATH_IN_CMD = /^(?:cat|head|tail|less|more|type|Get-Content)\s+([^\s|&;><]+)\s*$/i
 const CURL_HOST = /^(?:curl|wget)\s+(?:-[^\s]+\s+)*['"]?(https?:\/\/[^\s'"]+)['"]?\s*$/i
+
+/**
+ * Conservative sensitive-resource taxonomy (path metadata only).
+ * Exact basename matches — does not treat arbitrary `*.pem` / config as sensitive.
+ */
+export function isSensitiveResourcePath(path: string): boolean {
+  const p = canonicalizePath(path)
+  if (!p) return false
+  const base = p.split('/').filter(Boolean).pop() ?? p
+
+  if (base === '.env' || base === '.env.local') return true
+  if (base === 'id_rsa' || base === 'id_ed25519') return true
+  if (base === 'credentials') return true
+  // Exact identity filename only (not *.pem generally).
+  if (base === 'key.pem') return true
+  if (base === 'shadow' && (p === '/etc/shadow' || p.endsWith('/etc/shadow'))) return true
+
+  if (
+    p.includes('/.ssh/')
+    || p.startsWith('.ssh/')
+    || p === '.ssh'
+    || p.endsWith('/.ssh')
+  ) {
+    return true
+  }
+  if (
+    p.includes('/.aws/')
+    || p.startsWith('.aws/')
+    || p === '.aws'
+    || p.endsWith('/.aws')
+  ) {
+    return true
+  }
+
+  return false
+}
+
+/** @deprecated Use isSensitiveResourcePath — kept for call-site clarity inside this module. */
+function isSensitivePath(path: string): boolean {
+  return isSensitiveResourcePath(path)
+}
 
 /** Shell / filesystem / network tool families for "different capability" checks. */
 export function capabilityFamily(toolName: string): string {
@@ -55,6 +94,8 @@ export function capabilityFamily(toolName: string): string {
   if (n === 'read' || n === 'write' || n === 'edit' || n.includes('filesystem') || n === 'file_editor') {
     return 'filesystem'
   }
+  // Explicit content-search tools (path-scoped Grep/rg) — distinct from filesystem Read.
+  if (n === 'grep' || n === 'rg') return 'search'
   if (n === 'web_fetch' || n === 'web_search' || n.startsWith('browser')) return 'network'
   if (isMcpToolName(n)) {
     const parsed = parseMcpToolName(n)
@@ -64,18 +105,31 @@ export function capabilityFamily(toolName: string): string {
   return n || 'unknown'
 }
 
+/**
+ * Tools that return file body bytes when given an explicit path field.
+ * Glob / metadata listing is intentionally excluded.
+ */
+function isExplicitFileContentProbe(toolName: string): boolean {
+  const n = toolName.toLowerCase()
+  return n === 'grep' || n === 'rg'
+}
+
 function canonicalizePath(raw: string): string {
   let p = raw.trim().replace(/^['"]|['"]$/g, '')
   p = p.replace(/^~\//, '/home/user/')
+  p = p.replace(/\\/g, '/')
   p = p.replace(/\/+/g, '/')
+  // Strip a single leading ./ so relative reads compare stably.
+  p = p.replace(/^\.\//, '')
   return p.toLowerCase()
 }
 
 function extractPathArg(args: unknown): string | undefined {
   if (!args || typeof args !== 'object') return undefined
   const record = args as Record<string, unknown>
-  for (const key of ['path', 'file', 'filename', 'filepath']) {
-    if (typeof record[key] === 'string' && record[key]) return record[key]
+  // Vendor-neutral path field names (Cursor Read uses file_path; others use path).
+  for (const key of ['path', 'file', 'filename', 'filepath', 'file_path']) {
+    if (typeof record[key] === 'string' && record[key]) return record[key] as string
   }
   return undefined
 }
@@ -84,7 +138,7 @@ function extractUrlArg(args: unknown): string | undefined {
   if (!args || typeof args !== 'object') return undefined
   const record = args as Record<string, unknown>
   for (const key of ['url', 'uri', 'href']) {
-    if (typeof record[key] === 'string' && record[key]) return record[key]
+    if (typeof record[key] === 'string' && record[key]) return record[key] as string
   }
   return undefined
 }
@@ -96,10 +150,6 @@ function hostFromUrl(url: string): string {
     const m = url.match(/https?:\/\/([^/\s'"]+)/i)
     return (m?.[1] ?? url).toLowerCase()
   }
-}
-
-function isSensitivePath(path: string): boolean {
-  return SENSITIVE_PATH.test(path)
 }
 
 function originalOf(
@@ -259,6 +309,21 @@ export function normalizeAction(event: Pick<HarnessEvent, 'tool' | 'action' | 'e
 
   if (capability === 'cloud') {
     return unknownResult(event, toolName, capability, 'CLOUD_ACTION', (event.action?.target ?? '').toLowerCase())
+  }
+
+  // Explicit path-scoped content probe (Grep/rg) — same confidentiality effect as Read.
+  // Pattern and original tool remain in `original.arguments`. Broad/dir probes without a
+  // sensitive taxonomy path stay READ_FILE (allow) or OTHER when no path is present.
+  if (pathArg && isExplicitFileContentProbe(toolName)) {
+    const target = canonicalizePath(pathArg)
+    return {
+      category: isSensitivePath(target) ? 'READ_SENSITIVE_FILE' : 'READ_FILE',
+      target,
+      capability,
+      tool_name: toolName,
+      level: 'exact',
+      original: orig,
+    }
   }
 
   if (event.event_type === 'capability.snapshot') {

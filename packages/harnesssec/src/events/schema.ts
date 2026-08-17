@@ -13,6 +13,7 @@ export type HarnessName = string
 /** Convenience constants — not an exhaustive enum. */
 export const HARNESS_DEEPSEEK_DSH: HarnessName = 'deepseek-dsh'
 export const HARNESS_OPENHANDS: HarnessName = 'openhands'
+export const HARNESS_CURSOR: HarnessName = 'cursor'
 
 export type EventType =
   | 'session.started'
@@ -150,6 +151,14 @@ export interface HarnessEvent {
   raw?: {
     source_hook: string
     notes?: string
+    /** DERIVED policy evaluation snapshot (category/target from ActionNormalizer). */
+    normalized?: {
+      category: string
+      target: string
+      level: string
+      capability: string
+      tool_name: string
+    }
   }
 }
 

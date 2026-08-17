@@ -4,6 +4,7 @@ export {
   actionsEquivalent,
   differentCapability,
   isDetectionEligible,
+  isSensitiveResourcePath,
 } from './normalize.js'
 export type {
   ActionCategory,
