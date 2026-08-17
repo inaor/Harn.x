@@ -91,7 +91,7 @@ test('portability regression: same policy blocks DSH bash, OpenHands terminal, a
     assert.equal(cur.response.permission, 'deny')
     assert.ok(cur.events.some(e =>
       e.event_type === 'policy.decision'
-      && e.policy?.rule === 'credential-path-in-shell-args',
+      && e.policy?.rule === 'sensitive-resource-read',
     ))
     assert.ok(cur.events.every(e => e.harness.name === HARNESS_CURSOR))
 

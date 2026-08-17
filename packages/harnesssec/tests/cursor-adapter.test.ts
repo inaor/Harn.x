@@ -30,7 +30,7 @@ test('cursor: beforeShellExecution blocks credential path (production rule; sepa
     assert.equal(result.blocked, true)
     assert.equal(result.response.permission, 'deny')
     assert.match(String(result.response.user_message), /HARN\.X BLOCKED/)
-    assert.match(String(result.response.agent_message), /credential-path-in-shell-args|Prevented/)
+    assert.match(String(result.response.agent_message), /sensitive-resource-read|credential-path-in-shell-args|Prevented/)
     assert.ok(result.events.every(e => e.harness.name === HARNESS_CURSOR))
     assert.ok(result.events.some(e => e.event_type === 'tool.denied'))
     assert.ok(result.events.some(e => e.event_type === 'shell.command_requested'))

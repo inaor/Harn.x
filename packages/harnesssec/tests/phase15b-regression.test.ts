@@ -81,7 +81,7 @@ test('phase1.5b: untrusted + cat ~/.ssh/id_rsa => BLOCK', () => {
     const req = bashRequest(recorder, 's-ssh', 'cat ~/.ssh/id_rsa')
     const verdict = policy.evaluateToolRequest(req)
     assert.equal(verdict.decision, 'block')
-    assert.equal(verdict.rule?.id, 'credential-path-in-shell-args')
+    assert.equal(verdict.rule?.id, 'sensitive-resource-read')
   } finally {
     rmSync(dir, { recursive: true, force: true })
   }
@@ -101,7 +101,7 @@ test('phase1.5b: untrusted + credential/exfil command => BLOCK', () => {
     const credEnv = bashRequest(recorder, 's-exfil', 'cat .env.local')
     const credVerdict = policy.evaluateToolRequest(credEnv)
     assert.equal(credVerdict.decision, 'block')
-    assert.equal(credVerdict.rule?.id, 'credential-path-in-shell-args')
+    assert.equal(credVerdict.rule?.id, 'sensitive-resource-read')
   } finally {
     rmSync(dir, { recursive: true, force: true })
   }
@@ -142,8 +142,8 @@ test('phase1.5b: policy inspects raw in-memory secrets; persist has none', () =>
     assert.equal(beforePolicyArgs.api_key, secret)
     const verdict = policy.evaluateToolRequest(req)
     assert.equal(verdict.decision, 'block')
-    assert.equal(verdict.rule?.id, 'credential-path-in-shell-args')
-    assert.match(verdict.reason ?? '', /~\/\.ssh\/id_rsa/)
+    assert.equal(verdict.rule?.id, 'sensitive-resource-read')
+    assert.match(verdict.reason ?? '', /id_rsa/)
 
     const mem = recorder.getSession(sessionId)!.events.find(e => e.id === req.id)!
     assert.equal((mem.action!.arguments as any).api_key, secret)

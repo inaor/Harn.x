@@ -43,10 +43,49 @@ export interface NormalizedAction {
   original: OriginalActionEvidence
 }
 
-const SENSITIVE_PATH = /(?:~\/|\.?\/)?(?:\.ssh\/|\.aws\/)|(?:^|[\s"'`=])(?:id_rsa|id_ed25519|credentials|\.env(?:\.local)?|\/etc\/shadow)/i
-/** Only simple single-path read utilities — not arbitrary shell. */
 const PATH_IN_CMD = /^(?:cat|head|tail|less|more|type|Get-Content)\s+([^\s|&;><]+)\s*$/i
 const CURL_HOST = /^(?:curl|wget)\s+(?:-[^\s]+\s+)*['"]?(https?:\/\/[^\s'"]+)['"]?\s*$/i
+
+/**
+ * Conservative sensitive-resource taxonomy (path metadata only).
+ * Exact basename matches — does not treat arbitrary `*.pem` / config as sensitive.
+ */
+export function isSensitiveResourcePath(path: string): boolean {
+  const p = canonicalizePath(path)
+  if (!p) return false
+  const base = p.split('/').filter(Boolean).pop() ?? p
+
+  if (base === '.env' || base === '.env.local') return true
+  if (base === 'id_rsa' || base === 'id_ed25519') return true
+  if (base === 'credentials') return true
+  // Exact identity filename only (not *.pem generally).
+  if (base === 'key.pem') return true
+  if (base === 'shadow' && (p === '/etc/shadow' || p.endsWith('/etc/shadow'))) return true
+
+  if (
+    p.includes('/.ssh/')
+    || p.startsWith('.ssh/')
+    || p === '.ssh'
+    || p.endsWith('/.ssh')
+  ) {
+    return true
+  }
+  if (
+    p.includes('/.aws/')
+    || p.startsWith('.aws/')
+    || p === '.aws'
+    || p.endsWith('/.aws')
+  ) {
+    return true
+  }
+
+  return false
+}
+
+/** @deprecated Use isSensitiveResourcePath — kept for call-site clarity inside this module. */
+function isSensitivePath(path: string): boolean {
+  return isSensitiveResourcePath(path)
+}
 
 /** Shell / filesystem / network tool families for "different capability" checks. */
 export function capabilityFamily(toolName: string): string {
@@ -88,7 +127,7 @@ function extractUrlArg(args: unknown): string | undefined {
   if (!args || typeof args !== 'object') return undefined
   const record = args as Record<string, unknown>
   for (const key of ['url', 'uri', 'href']) {
-    if (typeof record[key] === 'string' && record[key]) return record[key]
+    if (typeof record[key] === 'string' && record[key]) return record[key] as string
   }
   return undefined
 }
@@ -100,10 +139,6 @@ function hostFromUrl(url: string): string {
     const m = url.match(/https?:\/\/([^/\s'"]+)/i)
     return (m?.[1] ?? url).toLowerCase()
   }
-}
-
-function isSensitivePath(path: string): boolean {
-  return SENSITIVE_PATH.test(path)
 }
 
 function originalOf(

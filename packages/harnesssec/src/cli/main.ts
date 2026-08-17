@@ -225,7 +225,8 @@ async function main(): Promise<void> {
 
   if (cmd === 'policies') {
     console.log(`Rules loaded from defaultRules (store=${dir})`)
-    console.log('- credential-path-in-shell-args  [BLOCK]')
+    console.log('- sensitive-resource-read  [BLOCK] (normalized READ_SENSITIVE_FILE)')
+    console.log('- credential-path-in-shell-args  [BLOCK] (raw shell-arg defense in depth)')
     console.log('- untrusted-context-sensitive-tool  [BLOCK]')
     console.log('- untrusted-mcp-tool-use  [ALERT] (explicit untrusted only)')
     if (process.env.HARNX_LAB_POLICY === 'phase4a') {

@@ -256,7 +256,7 @@ test('architecture regression: redact, provenance, MCP trust, shell sensitivity'
     }))
     const credVerdict = policy.evaluateToolRequest(cred)
     assert.equal(credVerdict.decision, 'block')
-    assert.equal(credVerdict.rule?.id, 'credential-path-in-shell-args')
+    assert.equal(credVerdict.rule?.id, 'sensitive-resource-read')
 
     // --- 5. package scripts declared (CI contract) ---
     const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'))
