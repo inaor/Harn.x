@@ -1,0 +1,45 @@
+{
+  "expected_verdicts": ["PASS"],
+  "files": [
+    {
+      "filename": "docs/phase4b-agent-reaction.md",
+      "status": "added",
+      "patch": "@@\n+Status: First implementation slice (PR #2); live acceptance pending\n+\n+agent.reaction is a factual classification after a Harn.x policy.decision BLOCK.\n+It does not add a new enforcement / pre-exec deny mechanism.\n+Security interpretation remains behavior.detection with unchanged bars.\n"
+    },
+    {
+      "filename": "packages/harnesssec/src/behavior/reaction.ts",
+      "status": "added",
+      "patch": "@@\n+export const DEFAULT_REACTION_WINDOW_MS = 120_000\n+const blockedReq = findBlockedToolRequest(events, block)\n+const blockedNorm = normalizeAction(blockedReq)\n+// policy-block → agent semantic reaction (harness-native)\n+if (isAlternateTool(blockedNorm, laterNorm)) return { type: 'ALTERNATE_TOOL' }\n+behavior.detection remains separate from agent.reaction\n"
+    },
+    {
+      "filename": "packages/harnesssec/src/behavior/engine.ts",
+      "status": "modified",
+      "patch": "@@\n+if (event.type === 'agent.reaction') return []\n"
+    },
+    {
+      "filename": "packages/harnesssec/tests/phase4b-reaction.test.ts",
+      "status": "added",
+      "patch": "@@\n+test('ALTERNATE_TOOL Read then Grep') {}\n+// FP: no circumvention — reaction is factual only\n"
+    },
+    {
+      "filename": ".github/guardian/fixtures/enforcement-claim-needs-integration.json",
+      "status": "added",
+      "patch": "@@\n+VERDICT: PASS\n+Native pre-exec BLOCK proven with side effect absent.\n+Phase 4A is COMPLETE.\n+Enforcement proven\n"
+    },
+    {
+      "filename": ".github/guardian/fixtures/behavior-edr-generic-reject.json",
+      "status": "added",
+      "patch": "@@\n+Reject: generic OS/EDR sequence\n+process tree + network flow\n+mirrors eBPF heuristics\n+behavior.detection policy_circumvention\n"
+    },
+    {
+      "filename": ".github/guardian/self-test.mjs",
+      "status": "modified",
+      "patch": "@@\n+// mentions VERDICT: PASS and side effect absent only as fixture expectations\n+console.log('VERDICT: PASS')\n"
+    },
+    {
+      "filename": ".github/guardian/review.mjs",
+      "status": "modified",
+      "patch": "@@\n+// Guardian rule text may mention EDR and side effect absent\n+message: 'Behavioral detection appears to duplicate generic EDR/OS signatures'\n+message: 'Enforcement/completion claim without integration test changes'\n+if (/\\bside[- ]effects?\\s+absent\\b/i.test(productAdded))\n"
+    }
+  ]
+}

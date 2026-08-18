@@ -30,7 +30,7 @@ Original tool name + arguments are always preserved on `NormalizedAction.origina
 | Action target | DERIVED | Canonical path/host when deterministic; else empty + unknown |
 | Policy result | OBSERVED | `policy.decision` |
 | Blocked action | OBSERVED + DERIVED | Block decision + normalized category/target (`BlockedActionMemory`) |
-| Agent reaction | CORRELATED | Later tool request after block (not `caused_by`) |
+| Agent reaction | CORRELATED / OBSERVED | Phase 4B `agent.reaction` — factual post-block class (`STOP`/`ASK_USER`/…); **not** `behavior.detection`; never `caused_by` |
 | Delegation | OBSERVED | `subagent.spawned` + explicit parent/child ids |
 | Child agent | OBSERVED | Child `agent.id` with `parent_agent_id` |
 | Capability available | OBSERVED | Latest `capability.snapshot.available` only — **replaces** prior set; never inferred from tool use; scoped by `(session_id, agent_id)` |

@@ -74,6 +74,11 @@ export class BehavioralEngine {
       }
       return []
     }
+    // Phase 4B reactions are factual correlator output — not detection input.
+    if (event.event_type === 'agent.reaction') {
+      this.indexLocal(event)
+      return []
+    }
 
     this.observeDepth++
     this.observing = true

@@ -35,6 +35,7 @@ export type EventType =
   | 'subagent.ended'
   | 'policy.decision'
   | 'policy.aftermath'
+  | 'agent.reaction'
   | 'behavior.detection'
   | 'approval.asked'
   | 'approval.decided'
@@ -146,6 +147,18 @@ export interface HarnessEvent {
       parent_agent_id?: string
       child_agent_id?: string
     }
+  }
+  /**
+   * Phase 4B AGENT_REACTION — factual post-policy classification.
+   * Never implies behavior.detection / circumvention.
+   */
+  reaction?: {
+    type: 'STOP' | 'ASK_USER' | 'RETRY_SAME' | 'ALTERNATE_TOOL' | 'DELEGATE' | 'UNKNOWN'
+    evidence: 'OBSERVED' | 'CORRELATED'
+    window_ms: number
+    for_policy_decision_id: string
+    supporting_event_ids: string[]
+    summary: string
   }
   links?: EventLinks
   raw?: {

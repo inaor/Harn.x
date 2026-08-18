@@ -19,9 +19,19 @@ export {
   BehavioralEngine,
   renderIncident,
   normalizeAction,
+  DEFAULT_REACTION_WINDOW_MS,
+  correlateAgentReaction,
+  correlateAllSessionReactions,
+  buildReactionEvent,
+  backfillSessionReactions,
   classifyPostBlockReaction,
 } from './behavior/index.js'
-export type { PostBlockReaction, ReactionClassification } from './behavior/index.js'
+export type {
+  AgentReactionType,
+  AgentReactionResult,
+  PostBlockReaction,
+  ReactionClassification,
+} from './behavior/index.js'
 export { createRuntime }
 
 /** Cordis plugin entry — `dsh plugin add` loads these from package root. */

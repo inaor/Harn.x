@@ -36,6 +36,23 @@ export function addedLines(patch) {
     .join('\n')
 }
 
+/** Guardian fixtures/self-tests must not trip product claim heuristics in the same PR. */
+export function isGuardianMetaPath(filename) {
+  return String(filename || '').replace(/\\/g, '/').includes('.github/guardian/')
+}
+
+/** @param {PrFile[]} files */
+export function productFilesOnly(files) {
+  return files.filter((f) => !isGuardianMetaPath(f.filename))
+}
+
+/** @param {PrFile[]} files */
+export function productAddedLines(files) {
+  return productFilesOnly(files)
+    .map((f) => addedLines(f.patch))
+    .join('\n')
+}
+
 /** @param {string} text */
 export function hasClosedHarnessNameUnion(text) {
   if (!text) return false
@@ -323,9 +340,18 @@ export function checkPhase3Behavior(files, root, findings, allAdded, names) {
     })
   }
 
-  if (/EDR|eBPF|process tree|network flow/i.test(allAdded)
-    && /behavior\.detection|policy_circumvention/i.test(allAdded)
-    && names.some((n) => n.includes('src/behavior/'))) {
+  // Behavioral code that cites real EDR/eBPF/OS signatures as detection basis.
+  // Word boundaries required — do not match identifiers like blockedReq / blockedNorm.
+  // Product text only: .github/guardian fixtures (which exemplify bad claims) must not
+  // poison the PR under review when shipped in the same change set.
+  const productAdded = productAddedLines(files)
+  const productNames = productFilesOnly(files).map((f) => f.filename)
+  const citesOsEdSignature = /\b(EDR|eBPF)\b|process tree|network flow/i.test(productAdded)
+  const citesBehaviorDetection = /\b(behavior\.detection|policy_circumvention)\b/i.test(productAdded)
+  const touchesBehaviorSrc = productNames.some((n) => n.replace(/\\/g, '/').includes('src/behavior/'))
+  // Factual AGENT_REACTION correlator (Phase 4B) is harness-native; not an EDR clone.
+  // engine.ts may only ignore agent.reaction — still allow when no OS/EDR signature text.
+  if (citesOsEdSignature && citesBehaviorDetection && touchesBehaviorSrc) {
     findings.push({
       severity: 'HIGH',
       file: 'src/behavior',
@@ -481,11 +507,39 @@ export function review(files, contractText, opts = {}) {
     })
   }
 
-  // Enforcement claims without integration proof
-  const claimsBlock = /side effect|BLOCK|pre-exec/i.test(allAdded)
-  const integrationTouched = names.some((n) => n.includes('tests/integration/'))
-  const docsClaimComplete = names.some((n) => /phase\d|findings|validation/i.test(n))
-  if (docsClaimComplete && /COMPLETE|PASS/i.test(allAdded) && claimsBlock && !integrationTouched) {
+  // Enforcement / phase-completion claims without integration proof.
+  // Narrow: require real completion/enforcement language with word boundaries.
+  // Do NOT match: "bypass" (contains PASS), "PARTIAL", or factual "policy BLOCK" prose
+  // in AGENT_REACTION / correlator docs that do not claim new enforcement.
+  // Evaluate product files only — Guardian self-test fixtures include VERDICT: PASS /
+  // "side effect absent" examples that must not poison the PR under review.
+  const productAdded = productAddedLines(files)
+  const productNames = productFilesOnly(files).map((f) => f.filename)
+  const integrationTouched = productNames.some((n) => n.includes('tests/integration/'))
+  const docsClaimComplete = productNames.some((n) => /phase\d|findings|validation/i.test(n))
+  const claimsPhaseCompletion =
+    /\b(COMPLETE|COMPLETED)\b/i.test(productAdded)
+    || /\bVERDICT:\s*PASS\b/i.test(productAdded)
+    || /\bFull Phase\b[\s\S]{0,80}\bPASS\b/i.test(productAdded)
+    || /\bphase\s+\d+[A-Z]?\s+(?:is\s+)?(?:COMPLETE|PASS)\b/i.test(productAdded)
+  const claimsEnforcementProof =
+    /\bside[- ]effects?\s+absent\b/i.test(productAdded)
+    || /\bpre-exec(?:ution)?\b[\s\S]{0,40}\b(block|deny|enforcement|proof)\b/i.test(productAdded)
+    || /\bNATIVE\s+PRE-EXEC\s+BLOCK\b/i.test(productAdded)
+    || /\benforcement\s+(?:proven|proof|complete|PASS)\b/i.test(productAdded)
+  // Explicit non-enforcement / factual-reaction docs must not trip this rule.
+  const factualReactionOnly =
+    /\bAGENT_REACTION\b/i.test(productAdded)
+    && /\bfactual\b/i.test(productAdded)
+    && !claimsEnforcementProof
+    && !/\bVERDICT:\s*PASS\b/i.test(productAdded)
+  if (
+    docsClaimComplete
+    && claimsPhaseCompletion
+    && claimsEnforcementProof
+    && !integrationTouched
+    && !factualReactionOnly
+  ) {
     findings.push({
       severity: 'HIGH',
       file: 'docs',

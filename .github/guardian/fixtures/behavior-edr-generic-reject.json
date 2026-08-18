@@ -1,0 +1,15 @@
+{
+  "expected_verdicts": ["REQUEST_CHANGES", "BLOCK"],
+  "files": [
+    {
+      "filename": "packages/harnesssec/src/behavior/detections.ts",
+      "status": "modified",
+      "patch": "@@\n+// Reject: generic OS/EDR sequence framed as harness behavioral detection\n+if (processTreeForks && networkFlowExfil) {\n+  emit({ kind: 'agent.policy_circumvention', title: 'EDR-like process tree + network flow' })\n+}\n+// also mentions eBPF for signature flavor\n+const note = 'mirrors eBPF process tree heuristics'\n"
+    },
+    {
+      "filename": "packages/harnesssec/tests/phase3-behavior.test.ts",
+      "status": "modified",
+      "patch": "@@\n+test('edry') {}\n"
+    }
+  ]
+}
